@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bismilla Traders - Product Management</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        <a href="{{ url_for('dashboard') }}" class="sidebar-item">Dashboard</a>
+        <a href="{{ url_for('product_management') }}" class="sidebar-item active">Product Management</a>
+        <a href="{{ url_for('inventory') }}" class="sidebar-item">Inventory</a>
+        <a href="{{ url_for('billing') }}" class="sidebar-item">Billing</a>
+        <a href="{{ url_for('reports') }}" class="sidebar-item">Reports</a>
+    </div>
+
+    <div class="content">
+        <h1>Product Stock Report</h1>
+        <div class="table-container">
+            <h2>Available Stock</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product Name</th>
+                        <th>Company Name</th>
+                        <th>Available Stock</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td>{{ product.name }}</td>
+                        <td>{{ product.company_name }}</td>
+                        <td>{{ product.stock_qty }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

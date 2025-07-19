@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bismilla Traders - Uploaded Invoices</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        <a href="{{ url_for('dashboard') }}" class="sidebar-item {% if request.path == url_for('dashboard') %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('inventory_selection') }}" class="sidebar-item {% if 'inventory' in request.path %}active{% endif %}">Inventory</a>
+        <a href="{{ url_for('billing_selection') }}" class="sidebar-item {% if 'billing' in request.path %}active{% endif %}">Billing</a>
+        <a href="{{ url_for('bills') }}" class="sidebar-item {% if 'bills' in request.path %}active{% endif %}">Bills</a>
+        <a href="{{ url_for('reports_selection') }}" class="sidebar-item {% if 'reports' in request.path %}active{% endif %}">Reports</a>
+        <a href="{{ url_for('logout') }}" class="sidebar-item">Log Out</a>
+    </div>
+
+    <div class="content">
+        <header class="dashboard-header">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Bismilla Traders Logo">
+            </div>
+            <h1>Uploaded Invoices</h1>
+            <p>Here you can view a record of all your uploaded invoices.</p>
+        </header>
+
+        <main class="dashboard-main">
+            <div class="table-container">
+                <div style="text-align: right; margin-bottom: 20px;">
+                    <a href="{{ url_for('upload_invoice_form') }}" class="button primary">Upload New Invoice</a>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Filename</th>
+                            <th>Upload Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for invoice in invoices %}
+                        <tr>
+                            <td>{{ invoice.original_filename }}</td>
+                            <td>{{ invoice.upload_date }}</td>
+                            <td>
+                                <a href="{{ url_for('view_uploaded_invoice', stored_filename=invoice.stored_filename) }}" class="button primary" target="_blank">View PDF</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3">No invoices have been uploaded yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

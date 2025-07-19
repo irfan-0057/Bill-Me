@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Product</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        <a href="{{ url_for('dashboard') }}" class="sidebar-item">Dashboard</a>
+        <a href="{{ url_for('inventory_selection') }}" class="sidebar-item active">Inventory</a>
+        <a href="{{ url_for('billing_selection') }}" class="sidebar-item">Billing</a>
+        <a href="{{ url_for('bills') }}" class="sidebar-item">Bills</a>
+        <a href="{{ url_for('reports_selection') }}" class="sidebar-item">Reports</a>
+    </div>
+
+    <div class="content">
+        <h1>Add New {{ product_type.capitalize() }}</h1>
+        <div class="form-section">
+            <form action="{{ url_for('add_product_web') }}" method="post">
+                <input type="hidden" name="product_type" value="{{ product_type }}">
+                <div class="input-group">
+                    <label for="name">Product Name:</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="input-group">
+                    <label for="company_name">Company Name:</label>
+                    <input type="text" id="company_name" name="company_name">
+                </div>
+                <div class="input-group">
+                    <label for="mfg_date">Mfg. Date:</label>
+                    <input type="date" id="mfg_date" name="mfg_date">
+                </div>
+                <div class="input-group">
+                    <label for="exp_date">Exp. Date:</label>
+                    <input type="date" id="exp_date" name="exp_date">
+                </div>
+                <div class="input-group">
+                    <label for="batch_num">Batch Number:</label>
+                    <input type="text" id="batch_num" name="batch_num">
+                </div>
+                <div class="input-group">
+                    <label for="hsn_code">HSN Code:</label>
+                    <input type="text" id="hsn_code" name="hsn_code">
+                </div>
+                <div class="input-group">
+                    <label for="pack_size">Pack Size:</label>
+                    <input type="text" id="pack_size" name="pack_size">
+                </div>
+                <div class="input-group">
+                    <label for="rate">Rate (₹):</label>
+                    <input type="number" id="rate" name="rate" step="0.01" required>
+                </div>
+                <div class="input-group">
+                    <label for="stock_qty">Stock Quantity:</label>
+                    <input type="number" id="stock_qty" name="stock_qty" required>
+                </div>
+                <div class="input-group">
+                    <label for="gst_percentage">GST %:</label>
+                    <input type="number" id="gst_percentage" name="gst_percentage" step="0.01" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="button primary">Add Product</button>
+                    <a href="{{ url_for('inventory_selection') }}" class="button secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

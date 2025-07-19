@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bismilla Traders - Edit Product</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        <a href="{{ url_for('dashboard') }}" class="sidebar-item">Dashboard</a>
+        <a href="{{ url_for('inventory_selection') }}" class="sidebar-item active">Inventory</a>
+        <a href="{{ url_for('billing_selection') }}" class="sidebar-item">Billing</a>
+        <a href="{{ url_for('bills') }}" class="sidebar-item">Bills</a>
+        <a href="{{ url_for('reports_selection') }}" class="sidebar-item">Reports</a>
+    </div>
+
+    <div class="content">
+        <header class="dashboard-header">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Bismilla Traders Logo">
+            </div>
+            <h1>Edit Product</h1>
+            <p>Update the details for {{ product.name }}</p>
+        </header>
+
+        <main class="dashboard-main">
+            <div class="form-section">
+                <form action="{{ url_for('update_product') }}" method="post">
+                    <input type="hidden" name="product_id" value="{{ product.id }}">
+                    <input type="hidden" name="product_type" value="{{ product.product_type }}">
+                    
+                    <div class="input-group">
+                        <label for="name">Product Name:</label>
+                        <input type="text" id="name" name="name" value="{{ product.name }}" required>
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="company_name">Company Name:</label>
+                        <input type="text" id="company_name" name="company_name" value="{{ product.company_name }}">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="mfg_date">MFG Date:</label>
+                        <input type="date" id="mfg_date" name="mfg_date" value="{{ product.mfg_date }}">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="exp_date">EXP Date:</label>
+                        <input type="date" id="exp_date" name="exp_date" value="{{ product.exp_date }}">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="batch_num">Batch Number:</label>
+                        <input type="text" id="batch_num" name="batch_num" value="{{ product.batch_num }}">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="hsn_code">HSN Code:</label>
+                        <input type="text" id="hsn_code" name="hsn_code" value="{{ product.hsn_code }}">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="pack_size">Pack Size:</label>
+                        <input type="text" id="pack_size" name="pack_size" value="{{ product.pack_size }}">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="rate">Rate:</label>
+                        <input type="number" id="rate" name="rate" step="0.01" value="{{ product.rate }}" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="stock_qty">Stock Quantity:</label>
+                        <input type="number" id="stock_qty" name="stock_qty" value="{{ product.stock_qty }}" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="gst_percentage">GST Percentage (%):</label>
+                        <input type="number" id="gst_percentage" name="gst_percentage" step="0.01" value="{{ product.gst_percentage }}">
+                    </div>
+                    
+                    <button type="submit" class="button primary">Update Product</button>
+                    <a href="{{ url_for('inventory', product_type=product.product_type) }}" class="button">Cancel</a>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

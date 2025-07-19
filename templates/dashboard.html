@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bismilla Traders - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        {% if g.role == 'admin' %}
+            <a href="{{ url_for('dashboard') }}" class="sidebar-item {% if request.path == url_for('dashboard') %}active{% endif %}">Dashboard</a>
+            <a href="{{ url_for('inventory_selection') }}" class="sidebar-item {% if 'inventory' in request.path %}active{% endif %}">Inventory</a>
+            <a href="{{ url_for('billing_selection') }}" class="sidebar-item {% if 'billing' in request.path %}active{% endif %}">Billing</a>
+            <a href="{{ url_for('bills') }}" class="sidebar-item {% if 'bills' in request.path %}active{% endif %}">Bills</a>
+            <a href="{{ url_for('reports_selection') }}" class="sidebar-item {% if 'reports' in request.path %}active{% endif %}">Reports</a>
+            <a href="{{ url_for('uploaded_invoices') }}" class="sidebar-item {% if 'invoices' in request.path %}active{% endif %}">Invoices</a>
+            <a href="{{ url_for('user_management') }}" class="sidebar-item {% if 'user_management' in request.path %}active{% endif %}">User Management</a>
+        {% else %}
+            <a href="{{ url_for('billing_selection') }}" class="sidebar-item {% if 'billing' in request.path %}active{% endif %}">Billing</a>
+            <a href="{{ url_for('bills') }}" class="sidebar-item {% if 'bills' in request.path %}active{% endif %}">Bills</a>
+        {% endif %}
+        <a href="{{ url_for('logout') }}" class="sidebar-item">Log Out</a>
+    </div>
+
+    <div class="content">
+        <header class="dashboard-header">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Bismilla Traders Logo">
+            </div>
+            <h1>Bismilla Traders</h1>
+            <p>Your one-stop solution for managing inventory and billing.</p>
+            {% if session.username %}
+                <div class="user-info">Logged in as: <strong>{{ session.username }}</strong> ({{ session.role.capitalize() }})</div>
+            {% endif %}
+        </header>
+
+        <main class="dashboard-main">
+            <div class="dashboard-grid">
+                {% if g.role == 'admin' %}
+                <a href="{{ url_for('inventory_selection') }}" class="dashboard-card">
+                    <div class="card-icon">📦</div>
+                    <div class="card-text">Inventory</div>
+                </a>
+                <a href="{{ url_for('billing_selection') }}" class="dashboard-card">
+                    <div class="card-icon">🧾</div>
+                    <div class="card-text">Billing</div>
+                </a>
+                <a href="{{ url_for('bills') }}" class="dashboard-card">
+                    <div class="card-icon">📂</div>
+                    <div class="card-text">Bills</div>
+                </a>
+                <a href="{{ url_for('reports_selection') }}" class="dashboard-card">
+                    <div class="card-icon">📈</div>
+                    <div class="card-text">Reports</div>
+                </a>
+                <a href="{{ url_for('uploaded_invoices') }}" class="dashboard-card">
+                    <div class="card-icon">📄</div>
+                    <div class="card-text">Uploaded Invoices</div>
+                </a>
+                <a href="{{ url_for('user_management') }}" class="dashboard-card">
+                    <div class="card-icon">👥</div>
+                    <div class="card-text">User Management</div>
+                </a>
+                {% else %}
+                <a href="{{ url_for('billing_selection') }}" class="dashboard-card">
+                    <div class="card-icon">🧾</div>
+                    <div class="card-text">Billing</div>
+                </a>
+                <a href="{{ url_for('bills') }}" class="dashboard-card">
+                    <div class="card-icon">📂</div>
+                    <div class="card-text">Bills</div>
+                </a>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

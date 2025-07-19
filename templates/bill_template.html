@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bill</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            font-size: 12px;
+        }
+        .bill-container {
+            width: 750px;
+            max-width: 95%;
+            margin: 0 auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin: 0;
+            color: #333;
+        }
+        .header p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .details-section {
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .details-section p {
+            margin: 5px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 12px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .totals-section {
+            text-align: right;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .totals-section p {
+            margin: 5px 0;
+        }
+        .signature-section {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+        .signature-section p {
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            width: 40%;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="bill-container">
+        <div class="header-top">
+            <div style="text-align: left;">
+                <p><strong>P.L.NO:</strong> {{ bill_data.pl_no }}</p>
+                <p><strong>S.L.NO:</strong> {{ bill_data.sl_no }}</p>
+            </div>
+            <div style="text-align: right;">
+                <p><strong>Bill Date:</strong> {{ bill_data.billDate }}</p>
+                <p><strong>Bill No:</strong> {{ bill_data.billNumber }}</p>
+            </div>
+        </div>
+
+        <div class="header">
+            <h1 style="font-size: 28px;">BISMILLA TRADERS</h1>
+            <p style="font-size: 16px;">Shop No: 5-86, Main Road, C Belagal -518462<br>Kurnool (Dist), Andhra Pradesh</p>
+            <p style="font-size: 16px;">Propertier: P Dowlath khan | Cell: 9441315556</p>
+            <p style="font-size: 16px;">GST: 37AOJPD7067D1ZY</p>
+        </div>
+
+        <div class="details-section">
+            <p><strong>Customer Name:</strong> {{ bill_data.customerName }}</p>
+            <p><strong>Village:</strong> {{ bill_data.village }}</p>
+            <p><strong>Mobile Number:</strong> {{ bill_data.mobileNum }}</p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>S.N</th>
+                    <th>Product</th>
+                    <th>Company Name</th>
+                    <th>Mfg. Date</th>
+                    <th>Exp. Date</th>
+                    <th>Batch No</th>
+                    <th>Pack Size</th>
+                    <th>Rate</th>
+                    <th>Qty</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in bill_data.products %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.company_name }}</td>
+                    <td>{{ product.mfg_date }}</td>
+                    <td>{{ product.exp_date }}</td>
+                    <td>{{ product.batch_num }}</td>
+                    <td>{{ product.pack_size }}</td>
+                    <td>₹{{ "%.2f"|format(product.rate) }}</td>
+                    <td>{{ product.qty }}</td>
+                    <td>₹{{ "%.2f"|format(product.amount) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totals-section">
+            <p><strong>Total Before Tax:</strong> ₹{{ "%.2f"|format(bill_data.totalBeforeTax) }}</p>
+            <p><strong>Total GST:</strong> ₹{{ "%.2f"|format(bill_data.totalGst) }}</p>
+            <p><strong>Grand Total:</strong> ₹{{ "%.2f"|format(bill_data.grandTotal) }}</p>
+        </div>
+
+        <div class="signature-section">
+            <p>Signature Of The Cultivator</p>
+            <p>Authorised Signature</p>
+        </div>
+    </div>
+</body>
+</html>

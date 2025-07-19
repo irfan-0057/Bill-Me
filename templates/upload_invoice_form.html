@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bismilla Traders - Upload Invoice</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        <a href="{{ url_for('dashboard') }}" class="sidebar-item {% if request.path == url_for('dashboard') %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('inventory_selection') }}" class="sidebar-item {% if 'inventory' in request.path %}active{% endif %}">Inventory</a>
+        <a href="{{ url_for('billing_selection') }}" class="sidebar-item {% if 'billing' in request.path %}active{% endif %}">Billing</a>
+        <a href="{{ url_for('bills') }}" class="sidebar-item {% if 'bills' in request.path %}active{% endif %}">Bills</a>
+        <a href="{{ url_for('reports_selection') }}" class="sidebar-item {% if 'reports' in request.path %}active{% endif %}">Reports</a>
+        <a href="{{ url_for('logout') }}" class="sidebar-item">Log Out</a>
+    </div>
+    <div class="content">
+        <header class="dashboard-header">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Bismilla Traders Logo">
+            </div>
+            <h1>Upload Invoice</h1>
+            <p>Upload a PDF invoice to store in your records.</p>
+        </header>
+        <main class="dashboard-main">
+            <div class="form-section">
+                <form action="{{ url_for('upload_invoice') }}" method="post" enctype="multipart/form-data">
+                    <div class="input-group">
+                        <label for="invoice">Select PDF Invoice:</label>
+                        <input type="file" id="invoice" name="invoice" accept="application/pdf" required>
+                    </div>
+                    <button type="submit" class="button primary">Upload Invoice</button>
+                    <a href="{{ url_for('uploaded_invoices') }}" class="button">View All Uploaded Invoices</a>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bismilla Traders - User Management</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        {% if g.role == 'admin' %}
+            <a href="{{ url_for('dashboard') }}" class="sidebar-item {% if request.path == url_for('dashboard') %}active{% endif %}">Dashboard</a>
+            <a href="{{ url_for('inventory_selection') }}" class="sidebar-item {% if 'inventory' in request.path %}active{% endif %}">Inventory</a>
+            <a href="{{ url_for('billing_selection') }}" class="sidebar-item {% if 'billing' in request.path %}active{% endif %}">Billing</a>
+            <a href="{{ url_for('bills') }}" class="sidebar-item {% if 'bills' in request.path %}active{% endif %}">Bills</a>
+            <a href="{{ url_for('reports_selection') }}" class="sidebar-item {% if 'reports' in request.path %}active{% endif %}">Reports</a>
+            <a href="{{ url_for('uploaded_invoices') }}" class="sidebar-item {% if 'invoices' in request.path %}active{% endif %}">Invoices</a>
+            <a href="{{ url_for('user_management') }}" class="sidebar-item {% if 'user_management' in request.path %}active{% endif %}">User Management</a>
+        {% else %}
+            <a href="{{ url_for('billing_selection') }}" class="sidebar-item {% if 'billing' in request.path %}active{% endif %}">Billing</a>
+            <a href="{{ url_for('bills') }}" class="sidebar-item {% if 'bills' in request.path %}active{% endif %}">Bills</a>
+        {% endif %}
+        <a href="{{ url_for('logout') }}" class="sidebar-item">Log Out</a>
+    </div>
+    
+    <div class="content">
+        <header class="dashboard-header">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Bismilla Traders Logo">
+            </div>
+            <h1>User Management</h1>
+            <p>Manage user accounts, roles, and passwords.</p>
+        </header>
+
+        <main class="dashboard-main">
+            <div class="table-container">
+                <div style="text-align: right; margin-bottom: 20px;">
+                    <a href="{{ url_for('add_user_form') }}" class="button primary">Add New User</a>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.role }}</td>
+                            <td>
+                                <a href="{{ url_for('edit_user_form', user_id=user.id) }}" class="button">Edit</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3">No users found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
