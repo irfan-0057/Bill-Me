@@ -8,22 +8,43 @@
             margin: 0;
             padding: 0;
             font-size: 12px;
+            line-height: 1.2;
         }
         .bill-container {
             width: 750px;
             max-width: 95%;
             margin: 0 auto;
-            padding: 20px;
+            padding: 0 10px 10px;
             box-sizing: border-box;
         }
-        .header-top {
+        .copy-label {
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            padding-top: 0;
+            margin-top: 0;
+            margin-bottom: 5px;
+        }
+        .top-info {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 20px;
+            align-items: flex-start;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        .top-info .left-info {
+            flex: 1;
+        }
+        .top-info .right-info {
+            flex: 1;
+            text-align: right;
+        }
+        .top-info p {
+            margin: 0;
         }
         .header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 5px;
         }
         .header h1 {
             font-size: 24px;
@@ -31,24 +52,31 @@
             color: #333;
         }
         .header p {
-            margin: 5px 0;
-            font-size: 14px;
+            margin: 2px 0;
+            font-size: 12px;
         }
         .details-section {
-            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 5px;
             font-size: 14px;
         }
-        .details-section p {
-            margin: 5px 0;
+        .details-section .left-details p {
+            margin: 2px 0;
+        }
+        .details-section .right-details {
+            text-align: right;
+            padding-left: 20px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
         th, td {
             border: 1px solid #ddd;
-            padding: 8px;
+            padding: 4px;
             text-align: left;
             font-size: 12px;
         }
@@ -57,14 +85,14 @@
         }
         .totals-section {
             text-align: right;
-            margin-top: 20px;
+            margin-top: 5px;
             font-size: 14px;
         }
         .totals-section p {
-            margin: 5px 0;
+            margin: 2px 0;
         }
         .signature-section {
-            margin-top: 50px;
+            margin-top: 15px;
             display: flex;
             justify-content: space-between;
             font-size: 14px;
@@ -75,32 +103,49 @@
             width: 40%;
             text-align: center;
         }
+        .separator {
+            border: none;
+            border-top: 2px dashed #999;
+            margin: 15px auto;
+            width: 80%;
+        }
     </style>
 </head>
 <body>
-    <div class="bill-container">
-        <div class="header-top">
-            <div style="text-align: left;">
-                <p><strong>P.L.NO:</strong> {{ bill_data.pl_no }}</p>
-                <p><strong>S.L.NO:</strong> {{ bill_data.sl_no }}</p>
+
+    <div class="bill-container">        
+        <div class="top-info">
+            <div class="left-info">
+                <p style="margin-bottom: 24px;"><strong>GST:</strong> 37AOJPD7067D1ZY</p>
+             
+                <p><strong>Bill No:</strong> BT/{{ bill_data.billNumber }}</p>
             </div>
-            <div style="text-align: right;">
-                <p><strong>Bill Date:</strong> {{ bill_data.billDate }}</p>
-                <p><strong>Bill No:</strong> {{ bill_data.billNumber }}</p>
+            <div class="right-info">
+                {% if bill_data.bill_type == 'pesticide' %}
+                <p><strong>P.L.NO:</strong>4452</p>
+                {% elif bill_data.bill_type == 'fertilizer' %}
+                <p><strong>F.L.NO:</strong>KNL/05/ADA/FR/2019/24403</p>
+                {% else %}
+                <p><strong>General Bill</strong></p>
+                {% endif %}
+                <p style="margin-top: 12px;"><strong>Cell :</strong> 9441315556</p>
             </div>
         </div>
 
         <div class="header">
-            <h1 style="font-size: 28px;">BISMILLA TRADERS</h1>
-            <p style="font-size: 16px;">Shop No: 5-86, Main Road, C Belagal -518462<br>Kurnool (Dist), Andhra Pradesh</p>
-            <p style="font-size: 16px;">Propertier: P Dowlath khan | Cell: 9441315556</p>
-            <p style="font-size: 16px;">GST: 37AOJPD7067D1ZY</p>
+            <h1>BISMILLA TRADERS</h1>
+            <p>Shop No: 5-86, Main Road, C Belagal -518462<br>Kurnool (Dist), Andhra Pradesh</p>
         </div>
 
         <div class="details-section">
-            <p><strong>Customer Name:</strong> {{ bill_data.customerName }}</p>
-            <p><strong>Village:</strong> {{ bill_data.village }}</p>
-            <p><strong>Mobile Number:</strong> {{ bill_data.mobileNum }}</p>
+            <div class="left-details">
+                <p><strong>Customer Name:</strong> {{ bill_data.customerName }}</p>
+                <p><strong>S/O:</strong> {{ bill_data.mobileNum }}</p>
+            </div>
+            <div class="right-details">
+                <p><strong>Bill Date:</strong> {{ bill_data.billDate }}</p>
+                <p><strong>Village:</strong> {{ bill_data.village }}</p>
+            </div>
         </div>
 
         <table>
@@ -109,12 +154,12 @@
                     <th>S.N</th>
                     <th>Product</th>
                     <th>Company Name</th>
+                    <th>Batch No</th>
                     <th>Mfg. Date</th>
                     <th>Exp. Date</th>
-                    <th>Batch No</th>
                     <th>Pack Size</th>
-                    <th>Rate</th>
                     <th>Qty</th>
+                    <th>Rate</th>
                     <th>Amount</th>
                 </tr>
             </thead>
@@ -124,12 +169,12 @@
                     <td>{{ loop.index }}</td>
                     <td>{{ product.name }}</td>
                     <td>{{ product.company_name }}</td>
+                    <td>{{ product.batch_num }}</td>
                     <td>{{ product.mfg_date }}</td>
                     <td>{{ product.exp_date }}</td>
-                    <td>{{ product.batch_num }}</td>
                     <td>{{ product.pack_size }}</td>
-                    <td>₹{{ "%.2f"|format(product.rate) }}</td>
                     <td>{{ product.qty }}</td>
+                    <td>₹{{ "%.2f"|format(product.rate) }}</td>
                     <td>₹{{ "%.2f"|format(product.amount) }}</td>
                 </tr>
                 {% endfor %}
@@ -137,10 +182,85 @@
         </table>
 
         <div class="totals-section">
-            <p><strong>Total Before Tax:</strong> ₹{{ "%.2f"|format(bill_data.totalBeforeTax) }}</p>
-            <p><strong>Total GST:</strong> ₹{{ "%.2f"|format(bill_data.totalGst) }}</p>
-            <p><strong>Grand Total:</strong> ₹{{ "%.2f"|format(bill_data.grandTotal) }}</p>
+            <p><strong>Before GST:</strong> ₹{{ "%.2f"|format(bill_data.totalBeforeTax) }}&nbsp;&nbsp;<strong>Total:</strong> ₹{{ "%.2f"|format(bill_data.grandTotal) }}</p>
         </div>
+
+        <div class="signature-section">
+            <p>Signature Of The Cultivator</p>
+            <p>Authorised Signature</p>
+        </div>
+    </div>
+
+    <hr class="separator">
+
+    <div class="bill-container">
+        
+        <div class="top-info">
+            <div class="left-info">
+                <p style="margin-bottom: 24px;"><strong>GST:</strong> 37AOJPD7067D1ZY</p>
+                <p><strong>Bill No:</strong>BT/ {{ bill_data.billNumber }}</p>
+            </div>
+            <div class="right-info">
+                {% if bill_data.bill_type == 'pesticide' %}
+                <p><strong>P.L.NO:</strong>4452</p>
+                {% elif bill_data.bill_type == 'fertilizer' %}
+                <p><strong>F.L.NO:</strong>KNL/05/ADA/FR/2019/24403</p>
+                {% else %}
+                <p><strong>General Bill</strong></p>
+                {% endif %}
+                <p style="margin-top: 12px;"><strong>Cell :</strong> 9441315556</p>
+            </div>
+        </div>
+        <div class="header">
+            <h1>BISMILLA TRADERS</h1>
+            <p>Shop No: 5-86, Main Road, C Belagal -518462<br>Kurnool (Dist), Andhra Pradesh</p>
+        </div>
+        <div class="details-section">
+            <div class="left-details">
+                <p><strong>Customer Name:</strong> {{ bill_data.customerName }}</p>
+                <p><strong>S/O:</strong> {{ bill_data.mobileNum }}</p>
+            </div>
+            <div class="right-details">
+                <p><strong>Bill Date:</strong> {{ bill_data.billDate }}</p>
+                <p><strong>Village:</strong> {{ bill_data.village }}</p>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>S.N</th>
+                    <th>Product</th>
+                    <th>Company Name</th>
+                    <th>Batch No</th>
+                    <th>Mfg. Date</th>
+                    <th>Exp. Date</th>
+                    <th>Pack Size</th>
+                    <th>Qty</th>
+                    <th>Rate</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in bill_data.products %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.company_name }}</td>
+                    <td>{{ product.batch_num }}</td>
+                    <td>{{ product.mfg_date }}</td>
+                    <td>{{ product.exp_date }}</td>
+                    <td>{{ product.pack_size }}</td>
+                    <td>{{ product.qty }}</td>
+                    <td>₹{{ "%.2f"|format(product.rate) }}</td>
+                    <td>₹{{ "%.2f"|format(product.amount) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totals-section">
+            <p><strong>Before GST:</strong> ₹{{ "%.2f"|format(bill_data.totalBeforeTax) }}&nbsp;&nbsp;<strong>Total:</strong> ₹{{ "%.2f"|format(bill_data.grandTotal) }}</p>
 
         <div class="signature-section">
             <p>Signature Of The Cultivator</p>
