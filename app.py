@@ -10,29 +10,19 @@ from functools import wraps
 import io
 from werkzeug.utils import secure_filename
 
-# --- START OF CODE MODIFICATION ---
-
-# Define a single, absolute path for the database file
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'billing_software.db')
-
 # Initialize the Flask app
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' # IMPORTANT: Change this to a random, secure key
 
-# Define and create upload folders
+# Define upload folder
 UPLOAD_FOLDER = 'invoices_uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-TEMP_FOLDER = 'temp'
-if not os.path.exists(TEMP_FOLDER):
-    os.makedirs(TEMP_FOLDER)
-
 # Function to connect to the database and create tables if they don't exist
 def init_db():
-    # Use the global DB_PATH to ensure the database is created in the correct location
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect('billing_software.db')
     cursor = conn.cursor()
 
     # Create the products table with product_type as a required field
@@ -52,7 +42,7 @@ def init_db():
             gst_percentage REAL
         );
     ''')
-
+    
     # Create the bills table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS bills (
@@ -85,7 +75,7 @@ def init_db():
             value INTEGER NOT NULL
         );
     ''')
-
+    
     cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", ('last_bill_number', 0))
 
     # New users table for login
@@ -97,7 +87,7 @@ def init_db():
             role TEXT NOT NULL
         );
     ''')
-
+    
     # Seed the database with initial users if they don't exist
     cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)", ('admin', 'admin123', 'admin'))
     cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)", ('user', 'user123', 'user'))
@@ -114,8 +104,10 @@ def init_db():
 
     conn.commit()
     conn.close()
-
-# --- END OF CODE MODIFICATION ---
+    
+    # Create temp directory for PDFs if it doesn't exist
+    if not os.path.exists('temp'):
+        os.makedirs('temp')
 
 # Login required decorator
 def login_required(f):
@@ -146,13 +138,13 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
-        conn = sqlite3.connect(DB_PATH)
+        
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
         cursor.execute("SELECT role FROM users WHERE username = ? AND password = ?", (username, password))
         user_data = cursor.fetchone()
         conn.close()
-
+        
         if user_data:
             session['username'] = username
             session['role'] = user_data[0]
@@ -162,7 +154,7 @@ def login():
                 return redirect(url_for('billing_selection'))
         else:
             return render_template('login.html', error="Invalid credentials. Please try again.")
-
+            
     return render_template('login.html')
 
 # Logout route
@@ -189,12 +181,12 @@ def bills():
 @app.route('/get_bills')
 @login_required
 def get_bills():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect('billing_software.db')
     cursor = conn.cursor()
     cursor.execute('SELECT bill_number, customer_name, bill_date, grand_total FROM bills ORDER BY bill_number DESC')
     bills_data = cursor.fetchall()
     conn.close()
-
+    
     bills_list = []
     for bill in bills_data:
         bills_list.append({
@@ -203,7 +195,7 @@ def get_bills():
             'bill_date': bill[2],
             'grand_total': bill[3]
         })
-
+    
     return jsonify(bills_list)
 
 # Route for inventory selection
@@ -220,11 +212,11 @@ def inventory_selection():
 def inventory(product_type):
     products = []
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM products WHERE product_type = ? ORDER BY name ASC;', (product_type,))
         products_data = cursor.fetchall()
-
+        
         # Convert the results to a list of dictionaries for easier use in the template
         for row in products_data:
             products.append({
@@ -245,20 +237,20 @@ def inventory(product_type):
         print(f"An error occurred: {e}")
     finally:
         conn.close()
-
+    
     return render_template('inventory.html', products=products, product_type=product_type)
 
 
 # API endpoint to add a new product
-@app.route('/add_product_web', methods=['POST'])
+@app.route('/add_product', methods=['POST'])
 @login_required
 @admin_only
 def add_product_web():
     data = request.form
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
-
+        
         cursor.execute('''
             INSERT INTO products (
                 name, company_name, product_type, mfg_date, exp_date, batch_num,
@@ -284,11 +276,11 @@ def add_product_web():
 def edit_product_form(product_id):
     product = None
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM products WHERE id = ?', (product_id,))
         row = cursor.fetchone()
-
+        
         if row:
             product = {
                 'id': row[0],
@@ -304,12 +296,12 @@ def edit_product_form(product_id):
                 'stock_qty': row[10],
                 'gst_percentage': row[11]
             }
-
+        
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
         conn.close()
-
+        
     if product:
         return render_template('edit_product_form.html', product=product)
     else:
@@ -322,12 +314,12 @@ def edit_product_form(product_id):
 def update_product():
     data = request.form
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
-
+        
         product_id = data['product_id']
         product_type = data['product_type']
-
+        
         cursor.execute('''
             UPDATE products SET
                 name = ?, company_name = ?, product_type = ?, mfg_date = ?,
@@ -345,7 +337,7 @@ def update_product():
         return jsonify({'error': str(e)}), 400
     finally:
         conn.close()
-
+        
 # Route to render the add product form for a specific type
 @app.route('/add_product_form/<product_type>')
 @login_required
@@ -365,7 +357,7 @@ def billing_selection():
 def billing(product_type):
     products = []
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
         # Fetch products only for the specified product type
         cursor.execute('SELECT id, name, company_name FROM products WHERE product_type = ? ORDER BY name ASC;', (product_type,))
@@ -374,7 +366,7 @@ def billing(product_type):
         print(f"An error occurred: {e}")
     finally:
         conn.close()
-
+    
     return render_template('billing.html', products=products, today_date=datetime.date.today(), product_type=product_type)
 
 # New API endpoint to get a single product's details by ID
@@ -382,7 +374,7 @@ def billing(product_type):
 @login_required
 def get_product_details(product_id):
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM products WHERE id = ?;', (product_id,))
         product = cursor.fetchone()
@@ -414,22 +406,22 @@ def get_product_details(product_id):
 @login_required
 def generate_pdf():
     data = request.json
-
-    conn = sqlite3.connect(DB_PATH)
+    
+    conn = sqlite3.connect('billing_software.db')
     cursor = conn.cursor()
-
+    
     try:
         # Get and increment the last bill number
         cursor.execute("SELECT value FROM settings WHERE key = 'last_bill_number'")
         last_bill_number = cursor.fetchone()[0]
         new_bill_number = last_bill_number + 1
         cursor.execute("UPDATE settings SET value = ? WHERE key = 'last_bill_number'", (new_bill_number,))
-
+        
         # Save the bill to the database
         cursor.execute('INSERT INTO bills (bill_number, customer_name, bill_date, grand_total) VALUES (?, ?, ?, ?);',
                        (new_bill_number, data['customerName'], data['billDate'], data['grandTotal']))
         bill_id = cursor.lastrowid
-
+        
         # Save bill items and update stock
         for item in data['products']:
             cursor.execute('UPDATE products SET stock_qty = stock_qty - ? WHERE name = ?;',
@@ -438,19 +430,32 @@ def generate_pdf():
                 INSERT INTO bill_items (bill_id, product_name, qty, rate, amount, gst_percentage)
                 VALUES (?, ?, ?, ?, ?, ?);
             ''', (bill_id, item['name'], item['qty'], item['rate'], item['amount'], item['gst']))
-
+            
         conn.commit()
 
-        data['pl_no'] = 'N/A'
-        data['sl_no'] = 'N/A'
-        data['billNumber'] = new_bill_number
+        # --- NEW LOGIC TO DETERMINE BILL TYPE ---
+        product_names = [item['name'] for item in data['products']]
+        bill_type = 'general' # Default to general bill
+        if product_names:
+            placeholders = ','.join(['?'] * len(product_names))
+            cursor.execute(f"SELECT DISTINCT product_type FROM products WHERE name IN ({placeholders})", product_names)
+            product_types = [row[0] for row in cursor.fetchall()]
+            
+            if 'pesticide' in product_types:
+                bill_type = 'pesticide'
+            elif 'fertilizer' in product_types:
+                bill_type = 'fertilizer'
+        # --- END NEW LOGIC ---
 
+        data['billNumber'] = new_bill_number
+        data['bill_type'] = bill_type
+        
         # Render the HTML template with the bill data
         html_string = render_template('bill_template.html', bill_data=data)
-
+        
         # Convert the HTML string to a PDF
         pdf_bytes = HTML(string=html_string).write_pdf()
-
+        
         # Create a unique filename and save the PDF temporarily
         filename = f"bill_{uuid.uuid4().hex}.pdf"
         filepath = os.path.join('temp', filename)
@@ -479,29 +484,38 @@ def serve_pdf(filename):
 @app.route('/view_bill/<int:bill_number>')
 @login_required
 def view_bill(bill_number):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect('billing_software.db')
     cursor = conn.cursor()
-
+    
     try:
         # Fetch bill header details
         cursor.execute('SELECT id, customer_name, bill_date, grand_total FROM bills WHERE bill_number = ?', (bill_number,))
         bill_header = cursor.fetchone()
-
+        
         if not bill_header:
             return "Bill not found.", 404
-
+            
         bill_id, customer_name, bill_date, grand_total = bill_header
-
+        
         # Fetch all bill items with full product details by joining with the products table
         cursor.execute('''
             SELECT T2.product_name, T2.qty, T2.rate, T2.amount, T2.gst_percentage,
-                   T3.company_name, T3.mfg_date, T3.exp_date, T3.batch_num, T3.pack_size
+                   T3.company_name, T3.mfg_date, T3.exp_date, T3.batch_num, T3.pack_size, T3.product_type
             FROM bill_items AS T2
             INNER JOIN products AS T3 ON T2.product_name = T3.name
             WHERE T2.bill_id = ?
         ''', (bill_id,))
-
+        
         bill_items = cursor.fetchall()
+        
+        # --- NEW LOGIC TO DETERMINE BILL TYPE ---
+        product_types = [item[10] for item in bill_items] # item[10] is the product_type
+        bill_type = 'general' # Default to general bill
+        if 'pesticide' in product_types:
+            bill_type = 'pesticide'
+        elif 'fertilizer' in product_types:
+            bill_type = 'fertilizer'
+        # --- END NEW LOGIC ---
 
         # Reconstruct the bill data dictionary
         bill_data = {
@@ -509,16 +523,17 @@ def view_bill(bill_number):
             'customerName': customer_name,
             'billDate': bill_date,
             'grandTotal': grand_total,
-            'village': 'N/A',
-            'mobileNum': 'N/A',
+            'village': 'N/A', # This data is not stored in the bills table
+            'mobileNum': 'N/A', # This data is not stored in the bills table
             'products': [],
             'totalBeforeTax': 0,
-            'totalGst': 0
+            'totalGst': 0,
+            'bill_type': bill_type # Add the new key
         }
-
+        
         for item in bill_items:
-            product_name, qty, rate, amount, gst_percentage, company_name, mfg_date, exp_date, batch_num, pack_size = item
-
+            product_name, qty, rate, amount, gst_percentage, company_name, mfg_date, exp_date, batch_num, pack_size, _ = item
+            
             bill_data['products'].append({
                 'name': product_name,
                 'qty': qty,
@@ -531,20 +546,20 @@ def view_bill(bill_number):
                 'batch_num': batch_num,
                 'pack_size': pack_size
             })
-
+            
             # Recalculate totals for display
             base_price = rate / (1 + gst_percentage / 100)
             gst_amount_per_item = rate - base_price
-
+            
             bill_data['totalBeforeTax'] += base_price * qty
             bill_data['totalGst'] += gst_amount_per_item * qty
-
+            
         # Render the HTML template with the reconstructed data
         html_string = render_template('bill_template.html', bill_data=bill_data)
-
+        
         # Convert HTML to PDF
         pdf_bytes = HTML(string=html_string).write_pdf()
-
+        
         return send_file(
             io.BytesIO(pdf_bytes),
             mimetype='application/pdf',
@@ -563,7 +578,7 @@ def view_bill(bill_number):
 @admin_only
 def reports_selection():
     return render_template('reports_selection.html')
-
+    
 # New route to handle the actual reports page
 @app.route('/reports/<product_type>')
 @login_required
@@ -571,7 +586,7 @@ def reports_selection():
 def reports(product_type):
     products = []
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
         cursor.execute('SELECT name FROM products WHERE product_type = ? ORDER BY name ASC;', (product_type,))
         products = [row[0] for row in cursor.fetchall()]
@@ -579,7 +594,7 @@ def reports(product_type):
         print(f"An error occurred: {e}")
     finally:
         conn.close()
-
+    
     return render_template('reports.html', products=products, product_type=product_type)
 
 # API endpoint for sales reports
@@ -593,7 +608,7 @@ def sales_report():
     product_name = request.args.get('product')
     product_type_filter = request.args.get('product_type')
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect('billing_software.db')
     cursor = conn.cursor()
 
     query_parts = {
@@ -618,27 +633,27 @@ def sales_report():
         query_parts['select'] = "SELECT T1.bill_date as period, SUM(T2.amount) as total_sales"
         query_parts['group_by'] = "GROUP BY period"
         query_parts['order_by'] = "ORDER BY T1.bill_date;"
-
+        
     elif report_type == 'monthly':
         query_parts['select'] = "SELECT strftime('%Y-%m', T1.bill_date) as period, SUM(T2.amount) as total_sales"
         query_parts['group_by'] = "GROUP BY period"
         query_parts['order_by'] = "ORDER BY T1.bill_date;"
-
+        
     elif report_type == 'yearly':
         query_parts['select'] = "SELECT strftime('%Y', T1.bill_date) as period, SUM(T2.amount) as total_sales"
         query_parts['group_by'] = "GROUP BY period"
         query_parts['order_by'] = "ORDER BY T1.bill_date;"
-
+    
     elif report_type == 'total_sales_productwise':
         query_parts['select'] = "SELECT T2.product_name as product_name, SUM(T2.qty) as total_qty, SUM(T2.amount) as total_sales"
         query_parts['group_by'] = "GROUP BY T2.product_name"
         query_parts['order_by'] = "ORDER BY T2.product_name;"
-
+        
     elif report_type == 'num_products_sold':
         query_parts['select'] = "SELECT T2.product_name as product_name, SUM(T2.qty) as total_qty"
         query_parts['group_by'] = "GROUP BY T2.product_name"
         query_parts['order_by'] = "ORDER BY T2.product_name;"
-
+        
     else:
         return jsonify({'error': 'Invalid report type'}), 400
 
@@ -647,7 +662,7 @@ def sales_report():
     try:
         cursor.execute(query, params)
         results = cursor.fetchall()
-
+        
         report_data = []
         if report_type == 'total_sales_productwise':
             for row in results:
@@ -696,9 +711,9 @@ def upload_invoice():
         stored_filename = f"{uuid.uuid4().hex}.pdf"
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], stored_filename)
         file.save(filepath)
-
+        
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect('billing_software.db')
             cursor = conn.cursor()
             cursor.execute("INSERT INTO invoices (original_filename, stored_filename, upload_date) VALUES (?, ?, ?)",
                            (original_filename, stored_filename, datetime.date.today()))
@@ -707,7 +722,7 @@ def upload_invoice():
             return jsonify({'error': str(e)}), 500
         finally:
             conn.close()
-
+            
         return redirect(url_for('uploaded_invoices'))
     return "Invalid file type. Only PDF files are allowed.", 400
 
@@ -717,7 +732,7 @@ def upload_invoice():
 def uploaded_invoices():
     invoices = []
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
         cursor.execute("SELECT original_filename, stored_filename, upload_date FROM invoices ORDER BY upload_date DESC")
         invoices_data = cursor.fetchall()
@@ -743,7 +758,7 @@ def view_uploaded_invoice(stored_filename):
 def user_management():
     users = []
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
         cursor.execute("SELECT id, username, role FROM users")
         users_data = cursor.fetchall()
@@ -760,7 +775,7 @@ def user_management():
 @admin_only
 def add_user_form():
     return render_template('add_user_form.html')
-
+    
 @app.route('/add_user', methods=['POST'])
 @login_required
 @admin_only
@@ -769,7 +784,7 @@ def add_user():
     password = request.form['password']
     role = request.form['role']
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
         cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
                        (username, password, role))
@@ -788,7 +803,7 @@ def add_user():
 def edit_user_form(user_id):
     user = None
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
         cursor.execute("SELECT id, username, role FROM users WHERE id = ?", (user_id,))
         user_data = cursor.fetchone()
@@ -802,7 +817,7 @@ def edit_user_form(user_id):
         return render_template('edit_user_form.html', user=user)
     else:
         return "User not found.", 404
-
+    
 @app.route('/update_user', methods=['POST'])
 @login_required
 @admin_only
@@ -811,23 +826,23 @@ def update_user():
     new_username = request.form['username']
     new_role = request.form['role']
     new_password = request.form['password']
-
+    
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect('billing_software.db')
         cursor = conn.cursor()
-
+        
         # Check if the username is being changed to an existing one
         cursor.execute("SELECT id FROM users WHERE username = ? AND id != ?", (new_username, user_id))
         if cursor.fetchone():
             return "Username already exists. Please choose a different username.", 400
-
+            
         if new_password:
             cursor.execute("UPDATE users SET username = ?, password = ?, role = ? WHERE id = ?",
                            (new_username, new_password, new_role, user_id))
         else:
             cursor.execute("UPDATE users SET username = ?, role = ? WHERE id = ?",
                            (new_username, new_role, user_id))
-
+            
         conn.commit()
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -835,12 +850,7 @@ def update_user():
         conn.close()
     return redirect(url_for('user_management'))
 
-
 # This part runs the app
 if __name__ == '__main__':
-    # This block is for local development only
     init_db()
-    app.run(debug=True)
-
-# For PythonAnywhere, you must call init_db() in your WSGI file
-# to set up the database the first time.
+    app.run(debug=False)
