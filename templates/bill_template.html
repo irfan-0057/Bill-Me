@@ -3,269 +3,221 @@
 <head>
     <title>Bill</title>
     <style>
+        @page {
+            size: A4;
+            margin: 20px;
+        }
+
         body {
-            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
+            font-family: Arial, sans-serif;
             font-size: 12px;
             line-height: 1.2;
         }
+
         .bill-container {
-            width: 750px;
-            max-width: 95%;
-            margin: 0 auto;
-            padding: 0 10px 10px;
+            max-width: 100%;
+            margin: 20px;
+            padding: 0;
             box-sizing: border-box;
         }
-        .copy-label {
-            text-align: center;
-            font-size: 14px;
-            font-weight: bold;
-            padding-top: 0;
-            margin-top: 0;
-            margin-bottom: 5px;
-        }
-        .top-info {
-            display: flex;
-            justify-content: space-between;
+
+        .top-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
             align-items: flex-start;
-            margin-bottom: 5px;
+            margin-bottom: 10px;
             font-size: 12px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 10px;
         }
-        .top-info .left-info {
-            flex: 1;
+
+        .header-left,
+        .header-center,
+        .header-right {
+            padding: 0 10px;
         }
-        .top-info .right-info {
-            flex: 1;
-            text-align: right;
-        }
-        .top-info p {
-            margin: 0;
-        }
-        .header {
+
+        .header-center {
             text-align: center;
-            margin-bottom: 5px;
         }
-        .header h1 {
-            font-size: 24px;
+
+        .header-center h1 {
+            font-size: 20px;
             margin: 0;
             color: #333;
         }
-        .header p {
+
+        .header-center p {
             margin: 2px 0;
             font-size: 12px;
         }
+
         .details-section {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 5px;
             font-size: 14px;
+            margin-bottom: 10px;
         }
-        .details-section .left-details p {
+
+        .details-section p {
             margin: 2px 0;
         }
-        .details-section .right-details {
-            text-align: right;
-            padding-left: 20px;
-        }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 10px;
+            table-layout: fixed;
         }
+
         th, td {
             border: 1px solid #ddd;
             padding: 4px;
             text-align: left;
             font-size: 12px;
+            height: 24px;
+            word-wrap: break-word;
         }
+
         th {
             background-color: #f2f2f2;
         }
+
         .totals-section {
             text-align: right;
             margin-top: 5px;
+            margin-bottom: 15px;
             font-size: 14px;
         }
+
         .totals-section p {
             margin: 2px 0;
         }
+
         .signature-section {
-            margin-top: 15px;
+            margin-top: 30px;
             display: flex;
             justify-content: space-between;
             font-size: 14px;
         }
+
         .signature-section p {
             border-top: 1px solid #000;
             padding-top: 5px;
             width: 40%;
             text-align: center;
         }
-        .separator {
-            border: none;
-            border-top: 2px dashed #999;
-            margin: 15px auto;
-            width: 80%;
-        }
     </style>
 </head>
 <body>
 
-    <div class="bill-container">        
-        <div class="top-info">
-            <div class="left-info">
-                <p style="margin-bottom: 24px;"><strong>GST:</strong> 37AOJPD7067D1ZY</p>
-             
-                <p><strong>Bill No:</strong> BT/{{ bill_data.billNumber }}</p>
-            </div>
-            <div class="right-info">
-                {% if bill_data.bill_type == 'pesticide' %}
-                <p><strong>P.L.NO:</strong>4452</p>
-                {% elif bill_data.bill_type == 'fertilizer' %}
-                <p><strong>F.L.NO:</strong>KNL/05/ADA/FR/2019/24403</p>
-                {% else %}
-                <p><strong>General Bill</strong></p>
-                {% endif %}
-                <p style="margin-top: 12px;"><strong>Cell :</strong> 9441315556</p>
-            </div>
+<div class="bill-container">
+
+    <!-- Top Header Section -->
+    <div class="top-header">
+        <div class="header-left">
+            <p><strong>GST:</strong> 37AOJPD7067D1ZY</p>
+            <p><strong>Bill No:</strong> BT/{{ bill_data.billNumber }}</p>
         </div>
 
-        <div class="header">
+        <div class="header-center">
             <h1>BISMILLA TRADERS</h1>
             <p>Shop No: 5-86, Main Road, C Belagal -518462<br>Kurnool (Dist), Andhra Pradesh</p>
         </div>
 
-        <div class="details-section">
-            <div class="left-details">
-                <p><strong>Customer Name:</strong> {{ bill_data.customerName }}</p>
-                <p><strong>S/O:</strong> {{ bill_data.mobileNum }}</p>
-            </div>
-            <div class="right-details">
-                <p><strong>Bill Date:</strong> {{ bill_data.billDate }}</p>
-                <p><strong>Village:</strong> {{ bill_data.village }}</p>
-            </div>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>S.N</th>
-                    <th>Product</th>
-                    <th>Company Name</th>
-                    <th>Batch No</th>
-                    <th>Mfg. Date</th>
-                    <th>Exp. Date</th>
-                    <th>Pack Size</th>
-                    <th>Qty</th>
-                    <th>Rate</th>
-                    <th>Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for product in bill_data.products %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ product.name }}</td>
-                    <td>{{ product.company_name }}</td>
-                    <td>{{ product.batch_num }}</td>
-                    <td>{{ product.mfg_date }}</td>
-                    <td>{{ product.exp_date }}</td>
-                    <td>{{ product.pack_size }}</td>
-                    <td>{{ product.qty }}</td>
-                    <td>₹{{ "%.2f"|format(product.rate) }}</td>
-                    <td>₹{{ "%.2f"|format(product.amount) }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <div class="totals-section">
-            <p><strong>Before GST:</strong> ₹{{ "%.2f"|format(bill_data.totalBeforeTax) }}&nbsp;&nbsp;<strong>Total:</strong> ₹{{ "%.2f"|format(bill_data.grandTotal) }}</p>
-        </div>
-
-        <div class="signature-section">
-            <p>Signature Of The Cultivator</p>
-            <p>Authorised Signature</p>
+        <div class="header-right">
+            {% if bill_data.bill_type == 'pesticide' %}
+            <p><strong>P.L.NO:</strong> 4452</p>
+            {% elif bill_data.bill_type == 'fertilizer' %}
+            <p><strong>F.L.NO:</strong> KNL/05/ADA/FR/2019/24403</p>
+            {% else %}
+            <p><strong>General Bill</strong></p>
+            {% endif %}
+            <p><strong>Cell:</strong> 9441315556</p>
+            {% set bill_date = bill_data.billDate.split('-') %}
+            <p><strong>Bill Date:</strong> {{ bill_date[2] }}-{{ bill_date[1] }}-{{ bill_date[0] }}</p>
         </div>
     </div>
 
-    <hr class="separator">
-
-    <div class="bill-container">
-        
-        <div class="top-info">
-            <div class="left-info">
-                <p style="margin-bottom: 24px;"><strong>GST:</strong> 37AOJPD7067D1ZY</p>
-                <p><strong>Bill No:</strong>BT/ {{ bill_data.billNumber }}</p>
-            </div>
-            <div class="right-info">
-                {% if bill_data.bill_type == 'pesticide' %}
-                <p><strong>P.L.NO:</strong>4452</p>
-                {% elif bill_data.bill_type == 'fertilizer' %}
-                <p><strong>F.L.NO:</strong>KNL/05/ADA/FR/2019/24403</p>
-                {% else %}
-                <p><strong>General Bill</strong></p>
-                {% endif %}
-                <p style="margin-top: 12px;"><strong>Cell :</strong> 9441315556</p>
-            </div>
-        </div>
-        <div class="header">
-            <h1>BISMILLA TRADERS</h1>
-            <p>Shop No: 5-86, Main Road, C Belagal -518462<br>Kurnool (Dist), Andhra Pradesh</p>
-        </div>
-        <div class="details-section">
-            <div class="left-details">
-                <p><strong>Customer Name:</strong> {{ bill_data.customerName }}</p>
-                <p><strong>S/O:</strong> {{ bill_data.mobileNum }}</p>
-            </div>
-            <div class="right-details">
-                <p><strong>Bill Date:</strong> {{ bill_data.billDate }}</p>
-                <p><strong>Village:</strong> {{ bill_data.village }}</p>
-            </div>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>S.N</th>
-                    <th>Product</th>
-                    <th>Company Name</th>
-                    <th>Batch No</th>
-                    <th>Mfg. Date</th>
-                    <th>Exp. Date</th>
-                    <th>Pack Size</th>
-                    <th>Qty</th>
-                    <th>Rate</th>
-                    <th>Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for product in bill_data.products %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ product.name }}</td>
-                    <td>{{ product.company_name }}</td>
-                    <td>{{ product.batch_num }}</td>
-                    <td>{{ product.mfg_date }}</td>
-                    <td>{{ product.exp_date }}</td>
-                    <td>{{ product.pack_size }}</td>
-                    <td>{{ product.qty }}</td>
-                    <td>₹{{ "%.2f"|format(product.rate) }}</td>
-                    <td>₹{{ "%.2f"|format(product.amount) }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <div class="totals-section">
-            <p><strong>Before GST:</strong> ₹{{ "%.2f"|format(bill_data.totalBeforeTax) }}&nbsp;&nbsp;<strong>Total:</strong> ₹{{ "%.2f"|format(bill_data.grandTotal) }}</p>
-
-        <div class="signature-section">
-            <p>Signature Of The Cultivator</p>
-            <p>Authorised Signature</p>
-        </div>
+    <!-- Customer Info -->
+    <div class="details-section">
+        <p><strong>Name:</strong> {{ bill_data.customerName }} &nbsp;&nbsp;&nbsp;
+           <strong>S/O:</strong> {{ bill_data.mobileNum }} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>Village:</strong> {{ bill_data.village }}</p>
     </div>
+
+    <!-- Product Table -->
+    <table>
+        <colgroup>
+            <col style="width: 4%;">
+            <col style="width: 16%;">
+            <col style="width: 12%;">
+            <col style="width: 8%;">
+            <col style="width: 12%;">
+            <col style="width: 12%;">
+            <col style="width: 8%;">
+            <col style="width: 5%;">
+            <col style="width: 10%;">
+            <col style="width: 10%;">
+        </colgroup>
+        <thead>
+        <tr>
+            <th>S.N</th>
+            <th>Product</th>
+            <th>Company Name</th>
+            <th>Batch No</th>
+            <th>Mfg. Date</th>
+            <th>Exp. Date</th>
+            <th>Pack Size</th>
+            <th>Qty</th>
+            <th>Rate</th>
+            <th>Amount</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for product in bill_data.products %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ product.name }}</td>
+            <td>{{ product.company_name }}</td>
+            <td>{{ product.batch_num }}</td>
+
+            {% set mfg = product.mfg_date.split('-') %}
+            <td>{{ mfg[2] }}-{{ mfg[1] }}-{{ mfg[0] }}</td>
+
+            {% set exp = product.exp_date.split('-') %}
+            <td>{{ exp[2] }}-{{ exp[1] }}-{{ exp[0] }}</td>
+
+            <td>{{ product.pack_size }}</td>
+            <td>{{ product.qty }}</td>
+            <td>₹{{ "%.2f"|format(product.rate) }}</td>
+            <td>₹{{ "%.2f"|format(product.amount) }}</td>
+        </tr>
+        {% endfor %}
+
+        {% for i in range(7 - bill_data.products|length) %}
+        <tr>
+            <td>{{ bill_data.products|length + i + 1 }}</td>
+            <td colspan="10">&nbsp;</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Totals -->
+    <div class="totals-section">
+        <p><strong>Before GST:</strong> ₹{{ "%.2f"|format(bill_data.totalBeforeTax) }} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+           <strong>+ CGST :</strong> ₹{{ "%.2f"|format(bill_data.totalGst / 2) }} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+           <strong>+ SGST :</strong> ₹{{ "%.2f"|format(bill_data.totalGst / 2) }} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+           <strong>Total:</strong> ₹{{ "%.2f"|format(bill_data.grandTotal) }}</p>
+    </div>
+
+    <!-- Signatures -->
+    <div class="signature-section">
+        <p>Signature Of The Cultivator</p>
+        <p>Authorised Signature</p>
+    </div>
+</div>
+
 </body>
 </html>
