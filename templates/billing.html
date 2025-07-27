@@ -99,26 +99,49 @@
 
             let billItems = [];
             let itemCounter = 1;
-            let selectedProductId = null;
+            let selectedProductId = null; // Initialize to null
+
+            // --- NEW FUNCTION TO UPDATE selectedProductId BASED ON INPUT TEXT ---
+            function updateSelectedProduct() {
+                const currentSearchTerm = productSearchInput.value.toLowerCase().trim(); // Trim whitespace
+                // Find if any product name or company name exactly matches the input
+                const foundProduct = products.find(product =>
+                    product[1].toLowerCase() === currentSearchTerm || // product name
+                    product[2].toLowerCase() === currentSearchTerm    // company name
+                );
+
+                if (foundProduct) {
+                    selectedProductId = foundProduct[0]; // Set the ID
+                } else {
+                    selectedProductId = null; // No exact match, so reset
+                }
+            }
+            // --- END NEW FUNCTION ---
 
             function renderSearchableOptions(filteredProducts) {
                 productOptionsDiv.innerHTML = '';
-                filteredProducts.forEach(product => {
-                    const optionDiv = document.createElement('div');
-                    optionDiv.textContent = `${product[1]} (${product[2]})`;
-                    optionDiv.dataset.id = product[0];
-                    optionDiv.addEventListener('click', () => {
-                        productSearchInput.value = optionDiv.textContent;
-                        selectedProductId = optionDiv.dataset.id;
-                        productOptionsDiv.style.display = 'none';
+                if (filteredProducts.length > 0) { // Only show options if there are any
+                    filteredProducts.forEach(product => {
+                        const optionDiv = document.createElement('div');
+                        // Use a combination of name and company for display
+                        optionDiv.textContent = `${product[1]} (${product[2]})`;
+                        optionDiv.dataset.id = product[0]; // Store the actual product ID
+                        optionDiv.addEventListener('click', () => {
+                            productSearchInput.value = optionDiv.textContent; // Set input value to the full displayed text
+                            selectedProductId = optionDiv.dataset.id; // Directly set ID from data-id
+                            productOptionsDiv.style.display = 'none';
+                        });
+                        productOptionsDiv.appendChild(optionDiv);
                     });
-                    productOptionsDiv.appendChild(optionDiv);
-                });
+                    productOptionsDiv.style.display = 'block'; // Ensure options are visible if results exist
+                } else {
+                    productOptionsDiv.style.display = 'none'; // Hide if no results
+                }
             }
 
             productSearchInput.addEventListener('focus', () => {
-                renderSearchableOptions(products);
-                productOptionsDiv.style.display = 'block';
+                renderSearchableOptions(products); // Show all options on focus
+                // No need to call updateSelectedProduct here, it will be handled by 'input' event
             });
 
             productSearchInput.addEventListener('input', () => {
@@ -126,21 +149,14 @@
                 const filteredProducts = products.filter(product =>
                     product[1].toLowerCase().includes(searchTerm) || product[2].toLowerCase().includes(searchTerm)
                 );
-                renderSearchableOptions(filteredProducts);
-                productOptionsDiv.style.display = 'block';
+                renderSearchableOptions(filteredProducts); // Update displayed options
 
-                // --- ADD THIS NEW LOGIC HERE ---
-                const matchedProduct = filteredProducts.find(product =>
-                    product[1].toLowerCase() === searchTerm || product[2].toLowerCase() === searchTerm
-                );
-                if (matchedProduct) {
-                    selectedProductId = matchedProduct[0]; // Set the ID if a direct match is found
-                } else {
-                    selectedProductId = null; // Reset if no direct match, forcing alert on addItem
-                }
-                // --- END OF NEW LOGIC ---
+                // --- CALL THE NEW FUNCTION HERE ---
+                updateSelectedProduct();
+                // --- END CALL ---
             });
 
+            // When a user clicks outside the searchable select, hide options
             document.addEventListener('click', (event) => {
                 if (!event.target.closest('.searchable-select-container')) {
                     productOptionsDiv.style.display = 'none';
@@ -149,29 +165,36 @@
 
             addItemBtn.addEventListener('click', async () => {
                 const qty = parseInt(qtyInput.value, 10);
-                if (!selectedProductId || qty <= 0) {
-                    alert('Please select a product and enter a valid quantity.');
+
+                // --- IMPORTANT: Ensure selectedProductId is checked HERE ---
+                // This log will show if selectedProductId is still null/undefined
+                console.log('Attempting to add item. selectedProductId:', selectedProductId, 'Qty:', qty);
+
+                if (selectedProductId === null || qty <= 0) { // Explicitly check for null
+                    alert('Please select a product from the list and enter a valid quantity.');
                     return;
                 }
 
                 try {
+                    // This fetch request is what was failing as /product/undefined
                     const response = await fetch(`/product/${selectedProductId}`);
                     const product = await response.json();
 
                     if (!response.ok) {
-                        alert(product.error);
+                        alert(product.error || 'Failed to fetch product details.');
                         return;
                     }
 
                     if (product.stock_qty < qty) {
-                        alert(`Not enough stock. Only ${product.stock_qty} available.`);
+                        alert(`Not enough stock for ${product.name}. Only ${product.stock_qty} available.`);
                         return;
                     }
 
                     const amount = (product.rate * qty);
 
                     const newItem = {
-                        id: itemCounter++,
+                        id: itemCounter++, // Unique ID for table row
+                        product_id: selectedProductId, // Store the actual product ID for potential future use (e.g., in bill generation)
                         name: product.name,
                         company_name: product.company_name,
                         mfg_date: product.mfg_date,
@@ -187,9 +210,10 @@
                     billItems.push(newItem);
                     renderBillItems();
                     updateTotals();
-                    productSearchInput.value = '';
-                    selectedProductId = null;
-                    qtyInput.value = 1;
+                    productSearchInput.value = ''; // Clear input after adding
+                    selectedProductId = null; // Reset for next selection
+                    qtyInput.value = 1; // Reset quantity
+                    productSearchInput.focus(); // Bring focus back to product search
                 } catch (error) {
                     console.error('Error adding item:', error);
                     alert('An error occurred while fetching product details.');
