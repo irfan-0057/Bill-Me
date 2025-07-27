@@ -991,10 +991,4 @@ def update_user():
         return jsonify({'error': str(e)}), 500
     return redirect(url_for('user_management'))
 
-# This part runs the app
-if __name__ == '__main__':
-    # Initialize the database and tables on application startup
-    # This will create tables if they don't exist and seed default users/settings
-    init_db()
-    # Run the Flask development server. debug=False is recommended for production.
-    app.run(debug=False)
+
