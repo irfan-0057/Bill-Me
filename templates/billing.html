@@ -49,7 +49,7 @@
                     <input type="number" id="qtyInput" min="1" value="1">
                     <button id="addItemBtn" class="button primary">Add Item</button>
                 </div>
-                
+
                 <table class="bill-item-table">
                     <thead>
                         <tr>
@@ -94,9 +94,9 @@
             const billDateInput = document.getElementById('billDate');
             const villageInput = document.getElementById('village');
             const mobileNumInput = document.getElementById('mobileNum');
-            
+
             const products = JSON.parse('{{ products | tojson | safe }}');
-            
+
             let billItems = [];
             let itemCounter = 1;
             let selectedProductId = null;
@@ -123,13 +123,24 @@
 
             productSearchInput.addEventListener('input', () => {
                 const searchTerm = productSearchInput.value.toLowerCase();
-                const filteredProducts = products.filter(product => 
+                const filteredProducts = products.filter(product =>
                     product[1].toLowerCase().includes(searchTerm) || product[2].toLowerCase().includes(searchTerm)
                 );
                 renderSearchableOptions(filteredProducts);
                 productOptionsDiv.style.display = 'block';
+
+                // --- ADD THIS NEW LOGIC HERE ---
+                const matchedProduct = filteredProducts.find(product =>
+                    product[1].toLowerCase() === searchTerm || product[2].toLowerCase() === searchTerm
+                );
+                if (matchedProduct) {
+                    selectedProductId = matchedProduct[0]; // Set the ID if a direct match is found
+                } else {
+                    selectedProductId = null; // Reset if no direct match, forcing alert on addItem
+                }
+                // --- END OF NEW LOGIC ---
             });
-            
+
             document.addEventListener('click', (event) => {
                 if (!event.target.closest('.searchable-select-container')) {
                     productOptionsDiv.style.display = 'none';
@@ -151,14 +162,14 @@
                         alert(product.error);
                         return;
                     }
-                    
+
                     if (product.stock_qty < qty) {
                         alert(`Not enough stock. Only ${product.stock_qty} available.`);
                         return;
                     }
 
                     const amount = (product.rate * qty);
-                    
+
                     const newItem = {
                         id: itemCounter++,
                         name: product.name,
@@ -172,7 +183,7 @@
                         gst: product.gst_percentage,
                         amount: parseFloat(amount)
                     };
-                    
+
                     billItems.push(newItem);
                     renderBillItems();
                     updateTotals();
@@ -216,20 +227,20 @@
                 let totalBeforeTax = 0;
                 let totalGst = 0;
                 let grandTotal = 0;
-                
+
                 billItems.forEach(item => {
                     grandTotal += item.amount;
                     const taxInclusiveRate = item.rate;
                     const gstPercentage = item.gst;
-                    
+
                     // Reverse-calculate the GST and pre-tax amount
                     const basePrice = taxInclusiveRate / (1 + gstPercentage / 100);
                     const gstAmountPerItem = taxInclusiveRate - basePrice;
-                    
+
                     totalBeforeTax += basePrice * item.qty;
                     totalGst += gstAmountPerItem * item.qty;
                 });
-                
+
                 totalBeforeTaxEl.textContent = totalBeforeTax.toFixed(2);
                 totalGstEl.textContent = totalGst.toFixed(2);
                 grandTotalEl.textContent = grandTotal.toFixed(2);
@@ -264,9 +275,9 @@
                         },
                         body: JSON.stringify(billData)
                     });
-                    
+
                     const result = await response.json();
-                    
+
                     if (response.ok) {
                         window.open(`/serve_pdf/${result.filename}`, '_blank');
                     } else {
