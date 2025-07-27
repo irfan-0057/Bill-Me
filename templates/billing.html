@@ -1,318 +1,211 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bismilla Traders - Billing</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <div class="sidebar">
-        <a href="{{ url_for('dashboard') }}" class="sidebar-item">Dashboard</a>
-        <a href="{{ url_for('inventory_selection') }}" class="sidebar-item">Inventory</a>
-        <a href="{{ url_for('billing_selection') }}" class="sidebar-item active">Billing</a>
-        <a href="{{ url_for('bills') }}" class="sidebar-item">Bills</a>
-        <a href="{{ url_for('reports_selection') }}" class="sidebar-item">Reports</a>
-    </div>
+<style>
+/* Optional styling improvement */
+#productOptions div {
+    cursor: pointer;
+    padding: 5px;
+}
+#productOptions div:hover {
+    background-color: #f0f0f0;
+}
+</style>
 
-    <div class="content">
-        <h1>Generate {{ product_type.capitalize() }} Bill</h1>
-        <div class="bill-form">
-            <div class="input-group">
-                <label for="customerName">Customer Name:</label>
-                <input type="text" id="customerName" required>
-            </div>
-            <div class="input-group">
-                <label for="billDate">Bill Date:</label>
-                <input type="date" id="billDate" value="{{ today_date }}" required>
-            </div>
-            <div class="input-group">
-                <label for="village">Village:</label>
-                <input type="text" id="village">
-            </div>
-            <div class="input-group">
-                <label for="mobileNum">S/O:</label>
-                <input type="text" id="mobileNum">
-            </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const productSearchInput = document.getElementById('productSearch');
+    const productOptionsDiv = document.getElementById('productOptions');
+    const qtyInput = document.getElementById('qtyInput');
+    const addItemBtn = document.getElementById('addItemBtn');
+    const billItemsBody = document.getElementById('bill-items-body');
+    const totalBeforeTaxEl = document.getElementById('totalBeforeTax');
+    const totalGstEl = document.getElementById('totalGst');
+    const grandTotalEl = document.getElementById('grandTotal');
+    const generateBillBtn = document.getElementById('generateBillBtn');
+    const customerNameInput = document.getElementById('customerName');
+    const billDateInput = document.getElementById('billDate');
+    const villageInput = document.getElementById('village');
+    const mobileNumInput = document.getElementById('mobileNum');
 
-            <div class="bill-items-section">
-                <h2>Bill Items</h2>
-                <div class="input-group">
-                    <label for="productSelect">Select Product:</label>
-                    <div class="searchable-select-container">
-                        <input type="text" id="productSearch" class="searchable-select" placeholder="Search for product...">
-                        <div id="productOptions" class="select-options"></div>
-                    </div>
-                </div>
-                <div class="input-group">
-                    <label for="qtyInput">Quantity:</label>
-                    <input type="number" id="qtyInput" min="1" value="1">
-                    <button id="addItemBtn" class="button primary">Add Item</button>
-                </div>
+    const products = JSON.parse('{{ products | tojson | safe }}');
 
-                <table class="bill-item-table">
-                    <thead>
-                        <tr>
-                            <th>S.N</th>
-                            <th>Product</th>
-                            <th>Company</th>
-                            <th>Qty</th>
-                            <th>Rate (Inc. GST)</th>
-                            <th>Amount (Inc. GST)</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="bill-items-body">
-                        </tbody>
-                </table>
-            </div>
+    let billItems = [];
+    let itemCounter = 1;
+    let selectedProductId = null;
 
-            <div class="totals-container">
-                <p><strong>Total Before Tax:</strong> ₹<span id="totalBeforeTax">0.00</span></p>
-                <p><strong>Total GST:</strong> ₹<span id="totalGst">0.00</span></p>
-                <p><strong>Grand Total:</strong> ₹<span id="grandTotal">0.00</span></p>
-            </div>
+    function renderSearchableOptions(filteredProducts) {
+        productOptionsDiv.innerHTML = '';
+        filteredProducts.forEach(product => {
+            const optionDiv = document.createElement('div');
+            optionDiv.textContent = `${product[1]} (${product[2]})`;
+            optionDiv.dataset.id = product[0];
+            optionDiv.addEventListener('click', () => {
+                productSearchInput.value = optionDiv.textContent;
+                selectedProductId = optionDiv.dataset.id;
+                productOptionsDiv.style.display = 'none';
+            });
+            productOptionsDiv.appendChild(optionDiv);
+        });
+    }
 
-            <div class="form-actions">
-                <button id="generateBillBtn" class="button primary">Generate Bill</button>
-            </div>
-        </div>
-    </div>
+    productSearchInput.addEventListener('focus', () => {
+        renderSearchableOptions(products);
+        productOptionsDiv.style.display = 'block';
+    });
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const productSearchInput = document.getElementById('productSearch');
-            const productOptionsDiv = document.getElementById('productOptions');
-            const qtyInput = document.getElementById('qtyInput');
-            const addItemBtn = document.getElementById('addItemBtn');
-            const billItemsBody = document.getElementById('bill-items-body');
-            const totalBeforeTaxEl = document.getElementById('totalBeforeTax');
-            const totalGstEl = document.getElementById('totalGst');
-            const grandTotalEl = document.getElementById('grandTotal');
-            const generateBillBtn = document.getElementById('generateBillBtn');
-            const customerNameInput = document.getElementById('customerName');
-            const billDateInput = document.getElementById('billDate');
-            const villageInput = document.getElementById('village');
-            const mobileNumInput = document.getElementById('mobileNum');
+    productSearchInput.addEventListener('input', () => {
+        selectedProductId = null;  // Always reset on typing
+        const searchTerm = productSearchInput.value.toLowerCase();
+        const filteredProducts = products.filter(product =>
+            product[1].toLowerCase().includes(searchTerm) || product[2].toLowerCase().includes(searchTerm)
+        );
+        renderSearchableOptions(filteredProducts);
+        productOptionsDiv.style.display = 'block';
+    });
 
-            const products = JSON.parse('{{ products | tojson | safe }}');
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.searchable-select-container')) {
+            productOptionsDiv.style.display = 'none';
+        }
+    });
 
-            let billItems = [];
-            let itemCounter = 1;
-            let selectedProductId = null; // Initialize to null
+    addItemBtn.addEventListener('click', async () => {
+        const qty = parseInt(qtyInput.value, 10);
+        if (!selectedProductId || selectedProductId === 'undefined' || qty <= 0) {
+            alert('❗ Please select a product from the list and enter a valid quantity.');
+            return;
+        }
 
-            // --- NEW FUNCTION TO UPDATE selectedProductId BASED ON INPUT TEXT ---
-            function updateSelectedProduct() {
-                const currentSearchTerm = productSearchInput.value.toLowerCase().trim(); // Trim whitespace
-                // Find if any product name or company name exactly matches the input
-                const foundProduct = products.find(product =>
-                    product[1].toLowerCase() === currentSearchTerm || // product name
-                    product[2].toLowerCase() === currentSearchTerm    // company name
-                );
+        try {
+            const response = await fetch(`/product/${selectedProductId}`);
+            const product = await response.json();
 
-                if (foundProduct) {
-                    selectedProductId = foundProduct[0]; // Set the ID
-                } else {
-                    selectedProductId = null; // No exact match, so reset
-                }
-            }
-            // --- END NEW FUNCTION ---
-
-            function renderSearchableOptions(filteredProducts) {
-                productOptionsDiv.innerHTML = '';
-                if (filteredProducts.length > 0) { // Only show options if there are any
-                    filteredProducts.forEach(product => {
-                        const optionDiv = document.createElement('div');
-                        // Use a combination of name and company for display
-                        optionDiv.textContent = `${product[1]} (${product[2]})`;
-                        optionDiv.dataset.id = product[0]; // Store the actual product ID
-                        optionDiv.addEventListener('click', () => {
-                            productSearchInput.value = optionDiv.textContent; // Set input value to the full displayed text
-                            selectedProductId = optionDiv.dataset.id; // Directly set ID from data-id
-                            productOptionsDiv.style.display = 'none';
-                        });
-                        productOptionsDiv.appendChild(optionDiv);
-                    });
-                    productOptionsDiv.style.display = 'block'; // Ensure options are visible if results exist
-                } else {
-                    productOptionsDiv.style.display = 'none'; // Hide if no results
-                }
+            if (!response.ok) {
+                alert(product.error);
+                return;
             }
 
-            productSearchInput.addEventListener('focus', () => {
-                renderSearchableOptions(products); // Show all options on focus
-                // No need to call updateSelectedProduct here, it will be handled by 'input' event
-            });
-
-            productSearchInput.addEventListener('input', () => {
-                const searchTerm = productSearchInput.value.toLowerCase();
-                const filteredProducts = products.filter(product =>
-                    product[1].toLowerCase().includes(searchTerm) || product[2].toLowerCase().includes(searchTerm)
-                );
-                renderSearchableOptions(filteredProducts); // Update displayed options
-
-                // --- CALL THE NEW FUNCTION HERE ---
-                updateSelectedProduct();
-                // --- END CALL ---
-            });
-
-            // When a user clicks outside the searchable select, hide options
-            document.addEventListener('click', (event) => {
-                if (!event.target.closest('.searchable-select-container')) {
-                    productOptionsDiv.style.display = 'none';
-                }
-            });
-
-            addItemBtn.addEventListener('click', async () => {
-                const qty = parseInt(qtyInput.value, 10);
-
-                // --- IMPORTANT: Ensure selectedProductId is checked HERE ---
-                // This log will show if selectedProductId is still null/undefined
-                console.log('Attempting to add item. selectedProductId:', selectedProductId, 'Qty:', qty);
-
-                if (selectedProductId === null || qty <= 0) { // Explicitly check for null
-                    alert('Please select a product from the list and enter a valid quantity.');
-                    return;
-                }
-
-                try {
-                    // This fetch request is what was failing as /product/undefined
-                    const response = await fetch(`/product/${selectedProductId}`);
-                    const product = await response.json();
-
-                    if (!response.ok) {
-                        alert(product.error || 'Failed to fetch product details.');
-                        return;
-                    }
-
-                    if (product.stock_qty < qty) {
-                        alert(`Not enough stock for ${product.name}. Only ${product.stock_qty} available.`);
-                        return;
-                    }
-
-                    const amount = (product.rate * qty);
-
-                    const newItem = {
-                        id: itemCounter++, // Unique ID for table row
-                        product_id: selectedProductId, // Store the actual product ID for potential future use (e.g., in bill generation)
-                        name: product.name,
-                        company_name: product.company_name,
-                        mfg_date: product.mfg_date,
-                        exp_date: product.exp_date,
-                        batch_num: product.batch_num,
-                        pack_size: product.pack_size,
-                        rate: product.rate,
-                        qty: qty,
-                        gst: product.gst_percentage,
-                        amount: parseFloat(amount)
-                    };
-
-                    billItems.push(newItem);
-                    renderBillItems();
-                    updateTotals();
-                    productSearchInput.value = ''; // Clear input after adding
-                    selectedProductId = null; // Reset for next selection
-                    qtyInput.value = 1; // Reset quantity
-                    productSearchInput.focus(); // Bring focus back to product search
-                } catch (error) {
-                    console.error('Error adding item:', error);
-                    alert('An error occurred while fetching product details.');
-                }
-            });
-
-            function renderBillItems() {
-                billItemsBody.innerHTML = '';
-                billItems.forEach((item, index) => {
-                    const row = billItemsBody.insertRow();
-                    row.dataset.id = item.id;
-                    row.innerHTML = `
-                        <td>${index + 1}</td>
-                        <td>${item.name}</td>
-                        <td>${item.company_name}</td>
-                        <td>${item.qty}</td>
-                        <td>₹${item.rate.toFixed(2)}</td>
-                        <td>₹${item.amount.toFixed(2)}</td>
-                        <td><button class="button danger remove-item-btn">Remove</button></td>
-                    `;
-                });
-
-                document.querySelectorAll('.remove-item-btn').forEach(button => {
-                    button.addEventListener('click', (event) => {
-                        const row = event.target.closest('tr');
-                        const itemId = parseInt(row.dataset.id, 10);
-                        billItems = billItems.filter(item => item.id !== itemId);
-                        renderBillItems();
-                        updateTotals();
-                    });
-                });
+            if (product.stock_qty < qty) {
+                alert(`Not enough stock. Only ${product.stock_qty} available.`);
+                return;
             }
 
-            function updateTotals() {
-                let totalBeforeTax = 0;
-                let totalGst = 0;
-                let grandTotal = 0;
+            const amount = (product.rate * qty);
 
-                billItems.forEach(item => {
-                    grandTotal += item.amount;
-                    const taxInclusiveRate = item.rate;
-                    const gstPercentage = item.gst;
+            const newItem = {
+                id: itemCounter++,
+                name: product.name,
+                company_name: product.company_name,
+                mfg_date: product.mfg_date,
+                exp_date: product.exp_date,
+                batch_num: product.batch_num,
+                pack_size: product.pack_size,
+                rate: product.rate,
+                qty: qty,
+                gst: product.gst_percentage,
+                amount: parseFloat(amount)
+            };
 
-                    // Reverse-calculate the GST and pre-tax amount
-                    const basePrice = taxInclusiveRate / (1 + gstPercentage / 100);
-                    const gstAmountPerItem = taxInclusiveRate - basePrice;
+            billItems.push(newItem);
+            renderBillItems();
+            updateTotals();
+            productSearchInput.value = '';
+            selectedProductId = null;
+            qtyInput.value = 1;
+        } catch (error) {
+            console.error('Error adding item:', error);
+            alert('An error occurred while fetching product details.');
+        }
+    });
 
-                    totalBeforeTax += basePrice * item.qty;
-                    totalGst += gstAmountPerItem * item.qty;
-                });
+    function renderBillItems() {
+        billItemsBody.innerHTML = '';
+        billItems.forEach((item, index) => {
+            const row = billItemsBody.insertRow();
+            row.dataset.id = item.id;
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${item.name}</td>
+                <td>${item.company_name}</td>
+                <td>${item.qty}</td>
+                <td>₹${item.rate.toFixed(2)}</td>
+                <td>₹${item.amount.toFixed(2)}</td>
+                <td><button class="button danger remove-item-btn">Remove</button></td>
+            `;
+        });
 
-                totalBeforeTaxEl.textContent = totalBeforeTax.toFixed(2);
-                totalGstEl.textContent = totalGst.toFixed(2);
-                grandTotalEl.textContent = grandTotal.toFixed(2);
-            }
-
-            generateBillBtn.addEventListener('click', async () => {
-                if (billItems.length === 0) {
-                    alert('Please add at least one item to the bill.');
-                    return;
-                }
-
-                const grandTotal = parseFloat(grandTotalEl.textContent);
-                const totalBeforeTax = parseFloat(totalBeforeTaxEl.textContent);
-                const totalGst = parseFloat(totalGstEl.textContent);
-
-                const billData = {
-                    customerName: customerNameInput.value,
-                    billDate: billDateInput.value,
-                    village: villageInput.value,
-                    mobileNum: mobileNumInput.value,
-                    products: billItems,
-                    totalBeforeTax: totalBeforeTax,
-                    totalGst: totalGst,
-                    grandTotal: grandTotal
-                };
-
-                try {
-                    const response = await fetch('/generate_pdf', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(billData)
-                    });
-
-                    const result = await response.json();
-
-                    if (response.ok) {
-                        window.open(`/serve_pdf/${result.filename}`, '_blank');
-                    } else {
-                        alert(`Error generating PDF: ${result.error}`);
-                    }
-                } catch (error) {
-                    console.error('Error generating bill:', error);
-                    alert('An error occurred while generating the bill.');
-                }
+        document.querySelectorAll('.remove-item-btn').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const row = event.target.closest('tr');
+                const itemId = parseInt(row.dataset.id, 10);
+                billItems = billItems.filter(item => item.id !== itemId);
+                renderBillItems();
+                updateTotals();
             });
         });
-    </script>
-</body>
-</html>
+    }
+
+    function updateTotals() {
+        let totalBeforeTax = 0;
+        let totalGst = 0;
+        let grandTotal = 0;
+
+        billItems.forEach(item => {
+            grandTotal += item.amount;
+            const taxInclusiveRate = item.rate;
+            const gstPercentage = item.gst;
+
+            const basePrice = taxInclusiveRate / (1 + gstPercentage / 100);
+            const gstAmountPerItem = taxInclusiveRate - basePrice;
+
+            totalBeforeTax += basePrice * item.qty;
+            totalGst += gstAmountPerItem * item.qty;
+        });
+
+        totalBeforeTaxEl.textContent = totalBeforeTax.toFixed(2);
+        totalGstEl.textContent = totalGst.toFixed(2);
+        grandTotalEl.textContent = grandTotal.toFixed(2);
+    }
+
+    generateBillBtn.addEventListener('click', async () => {
+        if (billItems.length === 0) {
+            alert('Please add at least one item to the bill.');
+            return;
+        }
+
+        const grandTotal = parseFloat(grandTotalEl.textContent);
+        const totalBeforeTax = parseFloat(totalBeforeTaxEl.textContent);
+        const totalGst = parseFloat(totalGstEl.textContent);
+
+        const billData = {
+            customerName: customerNameInput.value,
+            billDate: billDateInput.value,
+            village: villageInput.value,
+            mobileNum: mobileNumInput.value,
+            products: billItems,
+            totalBeforeTax: totalBeforeTax,
+            totalGst: totalGst,
+            grandTotal: grandTotal
+        };
+
+        try {
+            const response = await fetch('/generate_pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(billData)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                window.open(`/serve_pdf/${result.filename}`, '_blank');
+            } else {
+                alert(`Error generating PDF: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('Error generating bill:', error);
+            alert('An error occurred while generating the bill.');
+        }
+    });
+});
+</script>
