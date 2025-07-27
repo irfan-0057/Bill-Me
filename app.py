@@ -1,4 +1,4 @@
-# File: backend/app.py
+# File: app.py
 
 from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for, session, g, send_from_directory
 import sqlite3
@@ -433,9 +433,22 @@ def generate_pdf():
             
         conn.commit()
 
-        data['pl_no'] = 'N/A'
-        data['sl_no'] = 'N/A'
+        # --- NEW LOGIC TO DETERMINE BILL TYPE ---
+        product_names = [item['name'] for item in data['products']]
+        bill_type = 'general' # Default to general bill
+        if product_names:
+            placeholders = ','.join(['?'] * len(product_names))
+            cursor.execute(f"SELECT DISTINCT product_type FROM products WHERE name IN ({placeholders})", product_names)
+            product_types = [row[0] for row in cursor.fetchall()]
+            
+            if 'pesticide' in product_types:
+                bill_type = 'pesticide'
+            elif 'fertilizer' in product_types:
+                bill_type = 'fertilizer'
+        # --- END NEW LOGIC ---
+
         data['billNumber'] = new_bill_number
+        data['bill_type'] = bill_type
         
         # Render the HTML template with the bill data
         html_string = render_template('bill_template.html', bill_data=data)
@@ -487,7 +500,7 @@ def view_bill(bill_number):
         # Fetch all bill items with full product details by joining with the products table
         cursor.execute('''
             SELECT T2.product_name, T2.qty, T2.rate, T2.amount, T2.gst_percentage,
-                   T3.company_name, T3.mfg_date, T3.exp_date, T3.batch_num, T3.pack_size
+                   T3.company_name, T3.mfg_date, T3.exp_date, T3.batch_num, T3.pack_size, T3.product_type
             FROM bill_items AS T2
             INNER JOIN products AS T3 ON T2.product_name = T3.name
             WHERE T2.bill_id = ?
@@ -495,21 +508,31 @@ def view_bill(bill_number):
         
         bill_items = cursor.fetchall()
         
+        # --- NEW LOGIC TO DETERMINE BILL TYPE ---
+        product_types = [item[10] for item in bill_items] # item[10] is the product_type
+        bill_type = 'general' # Default to general bill
+        if 'pesticide' in product_types:
+            bill_type = 'pesticide'
+        elif 'fertilizer' in product_types:
+            bill_type = 'fertilizer'
+        # --- END NEW LOGIC ---
+
         # Reconstruct the bill data dictionary
         bill_data = {
             'billNumber': bill_number,
             'customerName': customer_name,
             'billDate': bill_date,
             'grandTotal': grand_total,
-            'village': 'N/A',
-            'mobileNum': 'N/A',
+            'village': 'N/A', # This data is not stored in the bills table
+            'mobileNum': 'N/A', # This data is not stored in the bills table
             'products': [],
             'totalBeforeTax': 0,
-            'totalGst': 0
+            'totalGst': 0,
+            'bill_type': bill_type # Add the new key
         }
         
         for item in bill_items:
-            product_name, qty, rate, amount, gst_percentage, company_name, mfg_date, exp_date, batch_num, pack_size = item
+            product_name, qty, rate, amount, gst_percentage, company_name, mfg_date, exp_date, batch_num, pack_size, _ = item
             
             bill_data['products'].append({
                 'name': product_name,
@@ -830,4 +853,4 @@ def update_user():
 # This part runs the app
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True)
+    app.run(debug=False)

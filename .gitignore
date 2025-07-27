@@ -1,0 +1,5 @@
+venv/
+billing_software.db
+__pycache__/
+temp/
+invoices_uploads/
