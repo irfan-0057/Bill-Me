@@ -853,4 +853,8 @@ def update_user():
 # This part runs the app
 if __name__ == '__main__':
     init_db()
+<<<<<<< HEAD
     app.run(debug=False)
+=======
+    app.run(debug=True)
+>>>>>>> 153415682cd95875424ab96664483c95530a69ad
