@@ -998,5 +998,3 @@ if __name__ == '__main__':
     init_db()
     # Run the Flask development server. debug=False is recommended for production.
     app.run(debug=False)
-
->>>>>>> 153415682cd95875424ab96664483c95530a69ad
