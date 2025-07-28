@@ -95,6 +95,7 @@
             const villageInput = document.getElementById('village');
             const mobileNumInput = document.getElementById('mobileNum');
             
+            // This line is correct in how it gets the products from Flask
             const products = JSON.parse('{{ products | tojson | safe }}');
             
             let billItems = [];
@@ -105,8 +106,9 @@
                 productOptionsDiv.innerHTML = '';
                 filteredProducts.forEach(product => {
                     const optionDiv = document.createElement('div');
-                    optionDiv.textContent = `${product[1]} (${product[2]})`;
-                    optionDiv.dataset.id = product[0];
+                    // FIX IS HERE: Access properties by name (product.name, product.company_name, product.id)
+                    optionDiv.textContent = `${product.name} (${product.company_name})`;
+                    optionDiv.dataset.id = product.id;
                     optionDiv.addEventListener('click', () => {
                         productSearchInput.value = optionDiv.textContent;
                         selectedProductId = optionDiv.dataset.id;
@@ -124,7 +126,8 @@
             productSearchInput.addEventListener('input', () => {
                 const searchTerm = productSearchInput.value.toLowerCase();
                 const filteredProducts = products.filter(product => 
-                    product[1].toLowerCase().includes(searchTerm) || product[2].toLowerCase().includes(searchTerm)
+                    // FIX IS HERE: Access properties by name (product.name, product.company_name)
+                    product.name.toLowerCase().includes(searchTerm) || product.company_name.toLowerCase().includes(searchTerm)
                 );
                 renderSearchableOptions(filteredProducts);
                 productOptionsDiv.style.display = 'block';
