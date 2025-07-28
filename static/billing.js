@@ -1,193 +1,186 @@
-// File: static/billing.js
+document.addEventListener('DOMContentLoaded', function () {
+    const productSearchInput = document.getElementById('productSearch');
+    const productOptionsDiv = document.getElementById('productOptions');
+    const qtyInput = document.getElementById('qtyInput');
+    const addItemBtn = document.getElementById('addItemBtn');
+    const billItemsBody = document.getElementById('bill-items-body');
+    const totalBeforeTaxEl = document.getElementById('totalBeforeTax');
+    const totalGstEl = document.getElementById('totalGst');
+    const grandTotalEl = document.getElementById('grandTotal');
+    const generateBillBtn = document.getElementById('generateBillBtn');
+    const customerNameInput = document.getElementById('customerName');
+    const billDateInput = document.getElementById('billDate');
+    const villageInput = document.getElementById('village');
+    const mobileNumInput = document.getElementById('mobileNum');
 
-document.addEventListener('DOMContentLoaded', function() {
-    let itemCounter = 0;
-    const billItemsTableBody = document.querySelector('#bill-items-table tbody');
-    const addItemBtn = document.getElementById('add-item-btn');
-    const generateBillBtn = document.getElementById('generate-bill-btn');
-    const grandTotalSpan = document.getElementById('grandTotal');
-    const totalBeforeTaxSpan = document.getElementById('totalBeforeTax');
-    const totalGstSpan = document.getElementById('totalGst');
+    let billItems = [];
+    let itemCounter = 1;
+    let selectedProductId = null;
 
-    // Function to calculate and update totals
-    function updateTotals() {
-        let grandTotal = 0;
-        let totalBeforeTax = 0;
-        let totalGst = 0;
-
-        document.querySelectorAll('.item-row').forEach(row => {
-            const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-            const rate = parseFloat(row.querySelector('.rate-input').value) || 0;
-            const gstPercentage = parseFloat(row.querySelector('.gst-input').value) || 0;
-
-            const amountBeforeTax = qty * rate;
-            const gstAmount = amountBeforeTax * (gstPercentage / 100);
-            const totalAmount = amountBeforeTax + gstAmount;
-
-            row.querySelector('.amount-input').value = totalAmount.toFixed(2);
-            
-            totalBeforeTax += amountBeforeTax;
-            totalGst += gstAmount;
-            grandTotal += totalAmount;
+    function renderSearchableOptions(filteredProducts) {
+        productOptionsDiv.innerHTML = '';
+        filteredProducts.forEach(product => {
+            const optionDiv = document.createElement('div');
+            optionDiv.textContent = `${product[1]} (${product[2]})`;
+            optionDiv.dataset.id = product[0];
+            optionDiv.addEventListener('click', () => {
+                productSearchInput.value = optionDiv.textContent;
+                selectedProductId = optionDiv.dataset.id;
+                productOptionsDiv.style.display = 'none';
+            });
+            productOptionsDiv.appendChild(optionDiv);
         });
-
-        totalBeforeTaxSpan.textContent = totalBeforeTax.toFixed(2);
-        totalGstSpan.textContent = totalGst.toFixed(2);
-        grandTotalSpan.textContent = grandTotal.toFixed(2);
     }
 
-    // Function to fetch product details
-    async function fetchProductDetails(productId, row) {
-        if (!productId) return;
-        try {
-            const response = await fetch(`/product/${productId}`);
-            if (!response.ok) {
-                throw new Error('Product not found');
-            }
-            const product = await response.json();
-            
-            row.querySelector('.company-name').value = product.company_name || 'N/A';
-            row.querySelector('.mfg-date').value = product.mfg_date || 'N/A';
-            row.querySelector('.exp-date').value = product.exp_date || 'N/A';
-            row.querySelector('.batch-num').value = product.batch_num || 'N/A';
-            row.querySelector('.rate-input').value = product.rate.toFixed(2) || 0;
-            row.querySelector('.gst-input').value = product.gst_percentage || 0;
+    productSearchInput.addEventListener('focus', () => {
+        renderSearchableOptions(products);
+        productOptionsDiv.style.display = 'block';
+    });
 
-            updateTotals();
-        } catch (error) {
-            console.error("Error fetching product details:", error);
+    productSearchInput.addEventListener('input', () => {
+        const searchTerm = productSearchInput.value.toLowerCase();
+        const filteredProducts = products.filter(product =>
+            product[1].toLowerCase().includes(searchTerm) ||
+            product[2].toLowerCase().includes(searchTerm)
+        );
+        renderSearchableOptions(filteredProducts);
+        productOptionsDiv.style.display = 'block';
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!event.target.closest('.searchable-select-container')) {
+            productOptionsDiv.style.display = 'none';
         }
-    }
+    });
 
-    // Function to add a new item row
-    function addItemRow() {
-        itemCounter++;
-        const newRow = document.createElement('tr');
-        newRow.classList.add('item-row');
-        newRow.innerHTML = `
-            <td>
-                <select class="product-select" required>
-                    <option value="">Select Product</option>
-                    ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-                </select>
-            </td>
-            <td><input type="text" class="company-name" disabled></td>
-            <td><input type="text" class="mfg-date" disabled></td>
-            <td><input type="text" class="exp-date" disabled></td>
-            <td><input type="text" class="batch-num" disabled></td>
-            <td><input type="number" step="0.01" class="rate-input" disabled></td>
-            <td><input type="number" class="qty-input" min="1" required></td>
-            <td><input type="number" step="0.01" class="gst-input" disabled></td>
-            <td><input type="number" step="0.01" class="amount-input" disabled></td>
-            <td><button class="remove-item-btn">Remove</button></td>
-        `;
-        billItemsTableBody.appendChild(newRow);
-
-        const productSelect = newRow.querySelector('.product-select');
-        productSelect.addEventListener('change', (e) => {
-            fetchProductDetails(e.target.value, newRow);
-        });
-
-        const qtyInput = newRow.querySelector('.qty-input');
-        qtyInput.addEventListener('input', updateTotals);
-
-        const removeItemBtn = newRow.querySelector('.remove-item-btn');
-        removeItemBtn.addEventListener('click', () => {
-            newRow.remove();
-            updateTotals();
-        });
-
-        updateTotals();
-    }
-
-    addItemBtn.addEventListener('click', addItemRow);
-
-    generateBillBtn.addEventListener('click', async () => {
-        const customerName = document.getElementById('customerName').value;
-        const village = document.getElementById('village').value;
-        const mobileNum = document.getElementById('mobileNum').value;
-        const billDate = document.getElementById('billDate').value;
-        const grandTotal = parseFloat(grandTotalSpan.textContent);
-        const totalBeforeTax = parseFloat(totalBeforeTaxSpan.textContent);
-        const totalGst = parseFloat(totalGstSpan.textContent);
-        
-        if (!customerName || !village || !mobileNum || !billDate || grandTotal === 0) {
-            alert('Please fill in all customer details and add at least one item.');
+    addItemBtn.addEventListener('click', async () => {
+        const qty = parseInt(qtyInput.value, 10);
+        if (!selectedProductId || qty <= 0) {
+            alert('Please select a product and enter a valid quantity.');
             return;
         }
 
-        const billItems = [];
-        document.querySelectorAll('.item-row').forEach(row => {
-            const productId = row.querySelector('.product-select').value;
-            const productName = row.querySelector('.product-select').options[row.querySelector('.product-select').selectedIndex].text;
-            const companyName = row.querySelector('.company-name').value;
-            const mfgDate = row.querySelector('.mfg-date').value;
-            const expDate = row.querySelector('.exp-date').value;
-            const batchNum = row.querySelector('.batch-num').value;
-            const rate = parseFloat(row.querySelector('.rate-input').value);
-            const qty = parseInt(row.querySelector('.qty-input').value);
-            const gst = parseFloat(row.querySelector('.gst-input').value);
-            const amount = parseFloat(row.querySelector('.amount-input').value);
+        try {
+            const response = await fetch(`/product/${selectedProductId}`);
+            const product = await response.json();
 
-            if (productId && qty > 0) {
-                billItems.push({
-                    name: productName,
-                    company_name: companyName,
-                    mfg_date: mfgDate,
-                    exp_date: expDate,
-                    batch_num: batchNum,
-                    rate: rate,
-                    qty: qty,
-                    gst: gst,
-                    amount: amount
-                });
+            if (!response.ok) {
+                alert(product.error);
+                return;
             }
+
+            if (product.stock_qty < qty) {
+                alert(`Not enough stock. Only ${product.stock_qty} available.`);
+                return;
+            }
+
+            const amount = product.rate * qty;
+            const newItem = {
+                id: itemCounter++,
+                name: product.name,
+                company_name: product.company_name,
+                mfg_date: product.mfg_date,
+                exp_date: product.exp_date,
+                batch_num: product.batch_num,
+                pack_size: product.pack_size,
+                rate: product.rate,
+                qty: qty,
+                gst: product.gst_percentage,
+                amount: parseFloat(amount)
+            };
+
+            billItems.push(newItem);
+            renderBillItems();
+            updateTotals();
+            productSearchInput.value = '';
+            selectedProductId = null;
+            qtyInput.value = 1;
+        } catch (error) {
+            console.error('Error adding item:', error);
+            alert('An error occurred while fetching product details.');
+        }
+    });
+
+    function renderBillItems() {
+        billItemsBody.innerHTML = '';
+        billItems.forEach((item, index) => {
+            const row = billItemsBody.insertRow();
+            row.dataset.id = item.id;
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${item.name}</td>
+                <td>${item.company_name}</td>
+                <td>${item.qty}</td>
+                <td>₹${item.rate.toFixed(2)}</td>
+                <td>₹${item.amount.toFixed(2)}</td>
+                <td><button class="button danger remove-item-btn">Remove</button></td>
+            `;
         });
 
+        document.querySelectorAll('.remove-item-btn').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const row = event.target.closest('tr');
+                const itemId = parseInt(row.dataset.id, 10);
+                billItems = billItems.filter(item => item.id !== itemId);
+                renderBillItems();
+                updateTotals();
+            });
+        });
+    }
+
+    function updateTotals() {
+        let totalBeforeTax = 0;
+        let totalGst = 0;
+        let grandTotal = 0;
+
+        billItems.forEach(item => {
+            grandTotal += item.amount;
+            const basePrice = item.rate / (1 + item.gst / 100);
+            const gstAmountPerItem = item.rate - basePrice;
+
+            totalBeforeTax += basePrice * item.qty;
+            totalGst += gstAmountPerItem * item.qty;
+        });
+
+        totalBeforeTaxEl.textContent = totalBeforeTax.toFixed(2);
+        totalGstEl.textContent = totalGst.toFixed(2);
+        grandTotalEl.textContent = grandTotal.toFixed(2);
+    }
+
+    generateBillBtn.addEventListener('click', async () => {
         if (billItems.length === 0) {
             alert('Please add at least one item to the bill.');
             return;
         }
 
         const billData = {
-            customerName: customerName,
-            village: village,
-            mobile_num: mobileNum,
-            billDate: billDate,
-            totalBeforeTax: totalBeforeTax,
-            totalGst: totalGst,
-            grandTotal: grandTotal,
-            products: billItems
+            customerName: customerNameInput.value,
+            billDate: billDateInput.value,
+            village: villageInput.value,
+            mobileNum: mobileNumInput.value,
+            products: billItems,
+            totalBeforeTax: parseFloat(totalBeforeTaxEl.textContent),
+            totalGst: parseFloat(totalGstEl.textContent),
+            grandTotal: parseFloat(grandTotalEl.textContent)
         };
 
         try {
             const response = await fetch('/generate_pdf', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(billData)
             });
 
+            const result = await response.json();
+
             if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `bill_${billDate}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
+                window.open(`/serve_pdf/${result.filename}`, '_blank');
             } else {
-                console.error("Failed to generate PDF");
-                alert("Failed to generate PDF. Please try again.");
+                alert(`Error generating PDF: ${result.error}`);
             }
         } catch (error) {
-            console.error("Error:", error);
-            alert("An error occurred. Please check the console for details.");
+            console.error('Error generating bill:', error);
+            alert('An error occurred while generating the bill.');
         }
     });
-
-    addItemRow(); // Add the first row on page load
 });
