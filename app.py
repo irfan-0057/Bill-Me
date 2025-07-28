@@ -809,6 +809,92 @@ def sales_report():
 
     return jsonify(report_data), 200
 
+# NEW ROUTES FOR INVOICE MANAGEMENT
+
+# Route to display the upload invoice form
+@app.route('/upload_invoice_form')
+@login_required
+@admin_only
+def upload_invoice_form():
+    logging.info("Rendering upload invoice form.")
+    return render_template('upload_invoice_form.html')
+
+# Route to handle invoice file uploads
+@app.route('/upload_invoice', methods=['POST'])
+@login_required
+@admin_only
+def upload_invoice():
+    if 'invoice_file' not in request.files:
+        logging.warning("No file part in upload request.")
+        return jsonify({'error': 'No file part'}), 400
+    
+    file = request.files['invoice_file']
+    
+    if file.filename == '':
+        logging.warning("No selected file for upload.")
+        return jsonify({'error': 'No selected file'}), 400
+    
+    if file:
+        original_filename = secure_filename(file.filename)
+        # Create a unique filename to avoid overwrites
+        stored_filename = f"{uuid.uuid4().hex}_{original_filename}"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], stored_filename)
+        
+        try:
+            file.save(filepath)
+            
+            # Save invoice details to the database
+            new_invoice = Invoice(
+                original_filename=original_filename,
+                stored_filename=stored_filename,
+                upload_date=datetime.date.today().strftime('%Y-%m-%d')
+            )
+            db.session.add(new_invoice)
+            db.session.commit()
+            
+            logging.info(f"Invoice '{original_filename}' uploaded and saved as '{stored_filename}'.")
+            return redirect(url_for('uploaded_invoices'))
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error uploading invoice '{original_filename}': {e}", exc_info=True)
+            return jsonify({'error': str(e)}), 500
+    
+    logging.error("Unhandled case in upload_invoice.")
+    return jsonify({'error': 'An unexpected error occurred'}), 500
+
+# Route to list all uploaded invoices
+@app.route('/uploaded_invoices')
+@login_required
+@admin_only
+def uploaded_invoices():
+    try:
+        invoices = Invoice.query.order_by(Invoice.upload_date.desc(), Invoice.original_filename.asc()).all()
+        logging.info(f"Fetched {len(invoices)} uploaded invoices.")
+        return render_template('uploaded_invoices.html', invoices=invoices)
+    except Exception as e:
+        logging.error(f"Error fetching uploaded invoices: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+# Route to download an uploaded invoice
+@app.route('/download_invoice/<filename>')
+@login_required
+@admin_only
+def download_invoice(filename):
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.exists(filepath):
+        # We need to get the original filename to set the download_name
+        invoice = Invoice.query.filter_by(stored_filename=filename).first()
+        if invoice:
+            download_name = invoice.original_filename
+        else:
+            download_name = filename # Fallback if not found in DB
+
+        logging.info(f"Serving uploaded invoice file: '{filename}' (original: '{download_name}').")
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True, download_name=download_name)
+    else:
+        logging.warning(f"Attempted to download non-existent invoice file: '{filename}'.")
+        return jsonify({'error': 'File not found'}), 404
+
 # --- Run the app ---
 if __name__ == '__main__':
     # Initialize the database and create tables
