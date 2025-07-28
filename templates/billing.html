@@ -5,123 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bismilla Traders - Billing</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        /* Basic styling for the search input and options */
-        .search-container {
-            position: relative;
-            width: 100%;
-            max-width: 500px; /* Adjust as needed */
-            margin-bottom: 20px;
-        }
-
-        .product-search {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-sizing: border-box; /* Include padding in element's total width */
-        }
-
-        .product-options {
-            position: absolute;
-            background-color: white;
-            border: 1px solid #ddd;
-            max-height: 200px;
-            overflow-y: auto;
-            width: 100%;
-            z-index: 1000;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-
-        .product-options div {
-            padding: 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #eee;
-        }
-
-        .product-options div:hover {
-            background-color: #f0f0f0;
-        }
-
-        .product-options div:last-child {
-            border-bottom: none;
-        }
-
-        /* Styles for the bill items table */
-        .bill-items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-
-        .bill-items-table th, .bill-items-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        .bill-items-table th {
-            background-color: #f2f2f2;
-        }
-
-        .bill-items-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-
-        .bill-items-table .actions button {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        .bill-summary {
-            margin-top: 20px;
-            text-align: right;
-            border-top: 1px solid #eee;
-            padding-top: 10px;
-        }
-
-        .bill-summary div {
-            margin-bottom: 5px;
-        }
-
-        .bill-summary .grand-total {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #28a745;
-        }
-        .bill-form {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .input-group label {
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-
-        .input-group input[type="text"],
-        .input-group input[type="date"],
-        .input-group input[type="number"],
-        .input-group select {
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            width: 100%; /* Ensures inputs take full width of their grid column */
-            box-sizing: border-box; /* Includes padding and border in the element's total width and height */
-        }
-    </style>
 </head>
 <body>
     <div class="sidebar">
@@ -148,59 +31,61 @@
                 <input type="text" id="village">
             </div>
             <div class="input-group">
-                <label for="mobileNum">Mobile Number:</label>
+                <label for="mobileNum">S/O:</label>
                 <input type="text" id="mobileNum">
             </div>
-        </div>
 
-        <h2>Add Product</h2>
-        <div class="add-product-section">
-            <div class="search-container">
-                <label for="productSearch">Product Name:</label>
-                <input type="text" id="productSearch" class="product-search" placeholder="Search for products...">
-                <div id="productOptions" class="product-options" style="display: none;"></div>
+            <div class="bill-items-section">
+                <h2>Bill Items</h2>
+                <div class="input-group">
+                    <label for="productSelect">Select Product:</label>
+                    <div class="searchable-select-container">
+                        <input type="text" id="productSearch" class="searchable-select" placeholder="Search for product...">
+                        <div id="productOptions" class="select-options"></div>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="qtyInput">Quantity:</label>
+                    <input type="number" id="qtyInput" min="1" value="1">
+                    <button id="addItemBtn" class="button primary">Add Item</button>
+                </div>
+                
+                <table class="bill-item-table">
+                    <thead>
+                        <tr>
+                            <th>S.N</th>
+                            <th>Product</th>
+                            <th>Company</th>
+                            <th>Qty</th>
+                            <th>Rate (Inc. GST)</th>
+                            <th>Amount (Inc. GST)</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bill-items-body">
+                        </tbody>
+                </table>
             </div>
-            <div class="input-group">
-                <label for="quantity">Quantity:</label>
-                <input type="number" id="quantity" min="1" value="1">
+
+            <div class="totals-container">
+                <p><strong>Total Before Tax:</strong> ₹<span id="totalBeforeTax">0.00</span></p>
+                <p><strong>Total GST:</strong> ₹<span id="totalGst">0.00</span></p>
+                <p><strong>Grand Total:</strong> ₹<span id="grandTotal">0.00</span></p>
             </div>
-            <button id="addProductBtn">Add Product to Bill</button>
+
+            <div class="form-actions">
+                <button id="generateBillBtn" class="button primary">Generate Bill</button>
+            </div>
         </div>
-
-        <h2>Bill Items</h2>
-        <table class="bill-items-table">
-            <thead>
-                <tr>
-                    <th>Product Name</th>
-                    <th>Company Name</th>
-                    <th>Rate</th>
-                    <th>Quantity</th>
-                    <th>GST (%)</th>
-                    <th>GST Amount</th>
-                    <th>Total Price</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="billItemsBody">
-                </tbody>
-        </table>
-
-        <div class="bill-summary">
-            <div>Total Before Tax: <span id="totalBeforeTax">0.00</span></div>
-            <div>Total GST: <span id="totalGst">0.00</span></div>
-            <div class="grand-total">Grand Total: <span id="grandTotal">0.00</span></div>
-        </div>
-
-        <button id="generateBillBtn">Generate Bill (PDF)</button>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const productSearchInput = document.getElementById('productSearch');
             const productOptionsDiv = document.getElementById('productOptions');
-            const quantityInput = document.getElementById('quantity');
-            const addProductBtn = document.getElementById('addProductBtn');
-            const billItemsBody = document.getElementById('billItemsBody');
+            const qtyInput = document.getElementById('qtyInput');
+            const addItemBtn = document.getElementById('addItemBtn');
+            const billItemsBody = document.getElementById('bill-items-body');
             const totalBeforeTaxEl = document.getElementById('totalBeforeTax');
             const totalGstEl = document.getElementById('totalGst');
             const grandTotalEl = document.getElementById('grandTotal');
@@ -209,25 +94,19 @@
             const billDateInput = document.getElementById('billDate');
             const villageInput = document.getElementById('village');
             const mobileNumInput = document.getElementById('mobileNum');
-
-            let selectedProductId = null;
-            let billItems = [];
-
-            // Parse products data passed from Flask
+            
             const products = JSON.parse('{{ products | tojson | safe }}');
+            
+            let billItems = [];
+            let itemCounter = 1;
+            let selectedProductId = null;
 
             function renderSearchableOptions(filteredProducts) {
                 productOptionsDiv.innerHTML = '';
-                if (filteredProducts.length === 0) {
-                    productOptionsDiv.style.display = 'none';
-                    return;
-                }
-
                 filteredProducts.forEach(product => {
                     const optionDiv = document.createElement('div');
-                    // CORRECTED: Access properties by name
-                    optionDiv.textContent = `${product.name} (${product.company_name})`;
-                    optionDiv.dataset.id = product.id; // Access id by property
+                    optionDiv.textContent = `${product[1]} (${product[2]})`;
+                    optionDiv.dataset.id = product[0];
                     optionDiv.addEventListener('click', () => {
                         productSearchInput.value = optionDiv.textContent;
                         selectedProductId = optionDiv.dataset.id;
@@ -235,72 +114,74 @@
                     });
                     productOptionsDiv.appendChild(optionDiv);
                 });
-                productOptionsDiv.style.display = 'block';
             }
 
-            productSearchInput.addEventListener('input', function() {
+            productSearchInput.addEventListener('focus', () => {
+                renderSearchableOptions(products);
+                productOptionsDiv.style.display = 'block';
+            });
+
+            productSearchInput.addEventListener('input', () => {
                 const searchTerm = productSearchInput.value.toLowerCase();
-                const filtered = products.filter(product =>
-                    // CORRECTED: Access properties by name for filtering
-                    product.name.toLowerCase().includes(searchTerm) ||
-                    (product.company_name && product.company_name.toLowerCase().includes(searchTerm))
+                const filteredProducts = products.filter(product => 
+                    product[1].toLowerCase().includes(searchTerm) || product[2].toLowerCase().includes(searchTerm)
                 );
-                renderSearchableOptions(filtered);
+                renderSearchableOptions(filteredProducts);
+                productOptionsDiv.style.display = 'block';
             });
-
-            productSearchInput.addEventListener('focus', function() {
-                renderSearchableOptions(products); // Show all options when focused
-            });
-
-            // Hide options if clicked outside
-            document.addEventListener('click', function(event) {
-                if (!productSearchInput.contains(event.target) && !productOptionsDiv.contains(event.target)) {
+            
+            document.addEventListener('click', (event) => {
+                if (!event.target.closest('.searchable-select-container')) {
                     productOptionsDiv.style.display = 'none';
                 }
             });
 
-            addProductBtn.addEventListener('click', async function() {
-                if (!selectedProductId) {
-                    alert('Please select a product from the search suggestions.');
-                    return;
-                }
-
-                const quantity = parseInt(quantityInput.value);
-                if (isNaN(quantity) || quantity <= 0) {
-                    alert('Please enter a valid quantity.');
+            addItemBtn.addEventListener('click', async () => {
+                const qty = parseInt(qtyInput.value, 10);
+                if (!selectedProductId || qty <= 0) {
+                    alert('Please select a product and enter a valid quantity.');
                     return;
                 }
 
                 try {
-                    const response = await fetch(`/api/product/${selectedProductId}`);
+                    const response = await fetch(`/product/${selectedProductId}`);
+                    const product = await response.json();
+
                     if (!response.ok) {
-                        throw new Error('Product not found or API error.');
+                        alert(product.error);
+                        return;
                     }
-                    const productData = await response.json(); // This should be an object
-
-                    // Check if product already exists in bill items
-                    const existingItemIndex = billItems.findIndex(item => item.id === productData.id);
-
-                    if (existingItemIndex > -1) {
-                        billItems[existingItemIndex].quantity += quantity;
-                    } else {
-                        billItems.push({
-                            id: productData.id,
-                            name: productData.name,
-                            company_name: productData.company_name,
-                            rate: productData.rate,
-                            gst_percent: productData.gst_percent,
-                            quantity: quantity
-                        });
+                    
+                    if (product.stock_qty < qty) {
+                        alert(`Not enough stock. Only ${product.stock_qty} available.`);
+                        return;
                     }
+
+                    const amount = (product.rate * qty);
+                    
+                    const newItem = {
+                        id: itemCounter++,
+                        name: product.name,
+                        company_name: product.company_name,
+                        mfg_date: product.mfg_date,
+                        exp_date: product.exp_date,
+                        batch_num: product.batch_num,
+                        pack_size: product.pack_size,
+                        rate: product.rate,
+                        qty: qty,
+                        gst: product.gst_percentage,
+                        amount: parseFloat(amount)
+                    };
+                    
+                    billItems.push(newItem);
                     renderBillItems();
-                    updateBillSummary();
-                    productSearchInput.value = ''; // Clear search bar
-                    quantityInput.value = 1; // Reset quantity
-                    selectedProductId = null; // Reset selected product
+                    updateTotals();
+                    productSearchInput.value = '';
+                    selectedProductId = null;
+                    qtyInput.value = 1;
                 } catch (error) {
-                    console.error('Error fetching product details:', error);
-                    alert('Could not add product. Please try again.');
+                    console.error('Error adding item:', error);
+                    alert('An error occurred while fetching product details.');
                 }
             });
 
@@ -308,67 +189,67 @@
                 billItemsBody.innerHTML = '';
                 billItems.forEach((item, index) => {
                     const row = billItemsBody.insertRow();
-                    const gstAmount = (item.rate * item.quantity * item.gst_percent / 100);
-                    const totalPrice = (item.rate * item.quantity) + gstAmount;
+                    row.dataset.id = item.id;
+                    row.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${item.name}</td>
+                        <td>${item.company_name}</td>
+                        <td>${item.qty}</td>
+                        <td>₹${item.rate.toFixed(2)}</td>
+                        <td>₹${item.amount.toFixed(2)}</td>
+                        <td><button class="button danger remove-item-btn">Remove</button></td>
+                    `;
+                });
 
-                    row.insertCell().textContent = item.name;
-                    row.insertCell().textContent = item.company_name;
-                    row.insertCell().textContent = item.rate.toFixed(2);
-                    row.insertCell().textContent = item.quantity;
-                    row.insertCell().textContent = item.gst_percent;
-                    row.insertCell().textContent = gstAmount.toFixed(2);
-                    row.insertCell().textContent = totalPrice.toFixed(2);
-
-                    const actionsCell = row.insertCell();
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.textContent = 'Remove';
-                    deleteBtn.addEventListener('click', () => {
-                        billItems.splice(index, 1);
+                document.querySelectorAll('.remove-item-btn').forEach(button => {
+                    button.addEventListener('click', (event) => {
+                        const row = event.target.closest('tr');
+                        const itemId = parseInt(row.dataset.id, 10);
+                        billItems = billItems.filter(item => item.id !== itemId);
                         renderBillItems();
-                        updateBillSummary();
+                        updateTotals();
                     });
-                    actionsCell.appendChild(deleteBtn);
                 });
             }
 
-            function updateBillSummary() {
+            function updateTotals() {
                 let totalBeforeTax = 0;
                 let totalGst = 0;
                 let grandTotal = 0;
-
+                
                 billItems.forEach(item => {
-                    const itemTotal = item.rate * item.quantity;
-                    const itemGst = itemTotal * (item.gst_percent / 100);
-                    totalBeforeTax += itemTotal;
-                    totalGst += itemGst;
-                    grandTotal += (itemTotal + itemGst);
+                    grandTotal += item.amount;
+                    const taxInclusiveRate = item.rate;
+                    const gstPercentage = item.gst;
+                    
+                    // Reverse-calculate the GST and pre-tax amount
+                    const basePrice = taxInclusiveRate / (1 + gstPercentage / 100);
+                    const gstAmountPerItem = taxInclusiveRate - basePrice;
+                    
+                    totalBeforeTax += basePrice * item.qty;
+                    totalGst += gstAmountPerItem * item.qty;
                 });
-
+                
                 totalBeforeTaxEl.textContent = totalBeforeTax.toFixed(2);
                 totalGstEl.textContent = totalGst.toFixed(2);
                 grandTotalEl.textContent = grandTotal.toFixed(2);
             }
 
-            generateBillBtn.addEventListener('click', async function() {
-                const customerName = customerNameInput.value.trim();
-                const billDate = billDateInput.value;
-                const village = villageInput.value.trim();
-                const mobileNum = mobileNumInput.value.trim();
-
-                if (!customerName || !billDate || billItems.length === 0) {
-                    alert('Please fill in customer name, bill date, and add at least one product.');
+            generateBillBtn.addEventListener('click', async () => {
+                if (billItems.length === 0) {
+                    alert('Please add at least one item to the bill.');
                     return;
                 }
 
+                const grandTotal = parseFloat(grandTotalEl.textContent);
                 const totalBeforeTax = parseFloat(totalBeforeTaxEl.textContent);
                 const totalGst = parseFloat(totalGstEl.textContent);
-                const grandTotal = parseFloat(grandTotalEl.textContent);
 
                 const billData = {
-                    customerName: customerName,
-                    billDate: billDate,
-                    village: village,
-                    mobileNum: mobileNum,
+                    customerName: customerNameInput.value,
+                    billDate: billDateInput.value,
+                    village: villageInput.value,
+                    mobileNum: mobileNumInput.value,
                     products: billItems,
                     totalBeforeTax: totalBeforeTax,
                     totalGst: totalGst,
@@ -383,9 +264,9 @@
                         },
                         body: JSON.stringify(billData)
                     });
-
+                    
                     const result = await response.json();
-
+                    
                     if (response.ok) {
                         window.open(`/serve_pdf/${result.filename}`, '_blank');
                     } else {
