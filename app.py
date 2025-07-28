@@ -1,6 +1,6 @@
 # File: app.py
 
-from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for, session, g
+from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for, session, g, send_from_directory
 import sqlite3 # Still needed for local init_db if running locally without DATABASE_URL set
 import datetime
 from weasyprint import HTML
