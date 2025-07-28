@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Bismilla Traders - Billing</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -16,7 +16,7 @@
     </div>
 
     <div class="content">
-        <h1>Generate {{ product_type.capitalize() }} Bill</h1>
+        <h1>Generate Product Bill</h1>
         <div class="bill-form">
             <div class="input-group">
                 <label for="customerName">Customer Name:</label>
@@ -38,7 +38,7 @@
             <div class="bill-items-section">
                 <h2>Bill Items</h2>
                 <div class="input-group">
-                    <label for="productSelect">Select Product:</label>
+                    <label for="productSearch">Select Product:</label>
                     <div class="searchable-select-container">
                         <input type="text" id="productSearch" class="searchable-select" placeholder="Search for product...">
                         <div id="productOptions" class="select-options"></div>
@@ -49,7 +49,7 @@
                     <input type="number" id="qtyInput" min="1" value="1">
                     <button id="addItemBtn" class="button primary">Add Item</button>
                 </div>
-                
+
                 <table class="bill-item-table">
                     <thead>
                         <tr>
@@ -62,8 +62,7 @@
                             <th>Action</th>
                         </tr>
                     </thead>
-                    <tbody id="bill-items-body">
-                        </tbody>
+                    <tbody id="bill-items-body"></tbody>
                 </table>
             </div>
 
@@ -80,204 +79,9 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const productSearchInput = document.getElementById('productSearch');
-            const productOptionsDiv = document.getElementById('productOptions');
-            const qtyInput = document.getElementById('qtyInput');
-            const addItemBtn = document.getElementById('addItemBtn');
-            const billItemsBody = document.getElementById('bill-items-body');
-            const totalBeforeTaxEl = document.getElementById('totalBeforeTax');
-            const totalGstEl = document.getElementById('totalGst');
-            const grandTotalEl = document.getElementById('grandTotal');
-            const generateBillBtn = document.getElementById('generateBillBtn');
-            const customerNameInput = document.getElementById('customerName');
-            const billDateInput = document.getElementById('billDate');
-            const villageInput = document.getElementById('village');
-            const mobileNumInput = document.getElementById('mobileNum');
-            
-            const products = JSON.parse('{{ products | tojson | safe }}');
-            
-            let billItems = [];
-            let itemCounter = 1;
-            let selectedProductId = null;
-
-            function renderSearchableOptions(filteredProducts) {
-                productOptionsDiv.innerHTML = '';
-                filteredProducts.forEach(product => {
-                    const optionDiv = document.createElement('div');
-                    optionDiv.textContent = `${product[1]} (${product[2]})`;
-                    optionDiv.dataset.id = product[0];
-                    optionDiv.addEventListener('click', () => {
-                        productSearchInput.value = optionDiv.textContent;
-                        selectedProductId = optionDiv.dataset.id;
-                        productOptionsDiv.style.display = 'none';
-                    });
-                    productOptionsDiv.appendChild(optionDiv);
-                });
-            }
-
-            productSearchInput.addEventListener('focus', () => {
-                renderSearchableOptions(products);
-                productOptionsDiv.style.display = 'block';
-            });
-
-            productSearchInput.addEventListener('input', () => {
-                const searchTerm = productSearchInput.value.toLowerCase();
-                const filteredProducts = products.filter(product => 
-                    product[1].toLowerCase().includes(searchTerm) || product[2].toLowerCase().includes(searchTerm)
-                );
-                renderSearchableOptions(filteredProducts);
-                productOptionsDiv.style.display = 'block';
-            });
-            
-            document.addEventListener('click', (event) => {
-                if (!event.target.closest('.searchable-select-container')) {
-                    productOptionsDiv.style.display = 'none';
-                }
-            });
-
-            addItemBtn.addEventListener('click', async () => {
-                const qty = parseInt(qtyInput.value, 10);
-                if (!selectedProductId || qty <= 0) {
-                    alert('Please select a product and enter a valid quantity.');
-                    return;
-                }
-
-                try {
-                    const response = await fetch(`/product/${selectedProductId}`);
-                    const product = await response.json();
-
-                    if (!response.ok) {
-                        alert(product.error);
-                        return;
-                    }
-                    
-                    if (product.stock_qty < qty) {
-                        alert(`Not enough stock. Only ${product.stock_qty} available.`);
-                        return;
-                    }
-
-                    const amount = (product.rate * qty);
-                    
-                    const newItem = {
-                        id: itemCounter++,
-                        name: product.name,
-                        company_name: product.company_name,
-                        mfg_date: product.mfg_date,
-                        exp_date: product.exp_date,
-                        batch_num: product.batch_num,
-                        pack_size: product.pack_size,
-                        rate: product.rate,
-                        qty: qty,
-                        gst: product.gst_percentage,
-                        amount: parseFloat(amount)
-                    };
-                    
-                    billItems.push(newItem);
-                    renderBillItems();
-                    updateTotals();
-                    productSearchInput.value = '';
-                    selectedProductId = null;
-                    qtyInput.value = 1;
-                } catch (error) {
-                    console.error('Error adding item:', error);
-                    alert('An error occurred while fetching product details.');
-                }
-            });
-
-            function renderBillItems() {
-                billItemsBody.innerHTML = '';
-                billItems.forEach((item, index) => {
-                    const row = billItemsBody.insertRow();
-                    row.dataset.id = item.id;
-                    row.innerHTML = `
-                        <td>${index + 1}</td>
-                        <td>${item.name}</td>
-                        <td>${item.company_name}</td>
-                        <td>${item.qty}</td>
-                        <td>₹${item.rate.toFixed(2)}</td>
-                        <td>₹${item.amount.toFixed(2)}</td>
-                        <td><button class="button danger remove-item-btn">Remove</button></td>
-                    `;
-                });
-
-                document.querySelectorAll('.remove-item-btn').forEach(button => {
-                    button.addEventListener('click', (event) => {
-                        const row = event.target.closest('tr');
-                        const itemId = parseInt(row.dataset.id, 10);
-                        billItems = billItems.filter(item => item.id !== itemId);
-                        renderBillItems();
-                        updateTotals();
-                    });
-                });
-            }
-
-            function updateTotals() {
-                let totalBeforeTax = 0;
-                let totalGst = 0;
-                let grandTotal = 0;
-                
-                billItems.forEach(item => {
-                    grandTotal += item.amount;
-                    const taxInclusiveRate = item.rate;
-                    const gstPercentage = item.gst;
-                    
-                    // Reverse-calculate the GST and pre-tax amount
-                    const basePrice = taxInclusiveRate / (1 + gstPercentage / 100);
-                    const gstAmountPerItem = taxInclusiveRate - basePrice;
-                    
-                    totalBeforeTax += basePrice * item.qty;
-                    totalGst += gstAmountPerItem * item.qty;
-                });
-                
-                totalBeforeTaxEl.textContent = totalBeforeTax.toFixed(2);
-                totalGstEl.textContent = totalGst.toFixed(2);
-                grandTotalEl.textContent = grandTotal.toFixed(2);
-            }
-
-            generateBillBtn.addEventListener('click', async () => {
-                if (billItems.length === 0) {
-                    alert('Please add at least one item to the bill.');
-                    return;
-                }
-
-                const grandTotal = parseFloat(grandTotalEl.textContent);
-                const totalBeforeTax = parseFloat(totalBeforeTaxEl.textContent);
-                const totalGst = parseFloat(totalGstEl.textContent);
-
-                const billData = {
-                    customerName: customerNameInput.value,
-                    billDate: billDateInput.value,
-                    village: villageInput.value,
-                    mobileNum: mobileNumInput.value,
-                    products: billItems,
-                    totalBeforeTax: totalBeforeTax,
-                    totalGst: totalGst,
-                    grandTotal: grandTotal
-                };
-
-                try {
-                    const response = await fetch('/generate_pdf', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(billData)
-                    });
-                    
-                    const result = await response.json();
-                    
-                    if (response.ok) {
-                        window.open(`/serve_pdf/${result.filename}`, '_blank');
-                    } else {
-                        alert(`Error generating PDF: ${result.error}`);
-                    }
-                } catch (error) {
-                    console.error('Error generating bill:', error);
-                    alert('An error occurred while generating the bill.');
-                }
-            });
-        });
+        const products = JSON.parse('{{ products | tojson | safe }}');
+        const todayDate = '{{ today_date }}';
     </script>
+    <script src="{{ url_for('static', filename='billing.js') }}"></script>
 </body>
 </html>
