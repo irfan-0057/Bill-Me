@@ -4,32 +4,53 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bismilla Traders - Login</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Ensure the body takes full height for vertical centering */
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: "Inter", sans-serif; /* Use Inter font */
+        }
+        /* Custom styles for the logo image if needed */
+        .logo img {
+            max-width: 120px; /* Adjust logo size as needed */
+            height: auto;
+        }
+    </style>
 </head>
-<body class="login-page">
-    <div class="login-container">
-        <header class="dashboard-header">
-            <div class="logo">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="Bismilla Traders Logo">
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="login-container bg-white p-8 rounded-xl shadow-lg w-full max-w-md mx-auto flex flex-col items-center">
+        <!-- Header Section -->
+        <header class="dashboard-header text-center mb-6">
+            <div class="logo mb-4">
+                <!-- Using the original logo path: logo.png -->
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Bismilla Traders Logo" class="mx-auto rounded-full border-4 border-teal-500">
             </div>
-            <h1>Bismilla Traders</h1>
-            <p>Please log in to continue</p>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Bismilla Traders</h1>
+            <p class="text-gray-600">Please log in to continue</p>
         </header>
         
-        <div class="form-section">
+        <!-- Form Section -->
+        <div class="form-section w-full">
+            <!-- Error message display -->
             {% if error %}
-                <p style="color: red; text-align: center;">{{ error }}</p>
+                <p class="text-red-500 text-center mb-4">{{ error }}</p>
             {% endif %}
-            <form action="{{ url_for('login') }}" method="post">
+            
+            <form action="{{ url_for('login') }}" method="post" class="space-y-4">
                 <div class="input-group">
-                    <label for="username">Username:</label>
-                    <input type="text" id="username" name="username" required>
+                    <label for="username" class="block text-gray-700 text-sm font-semibold mb-2">Username:</label>
+                    <input type="text" id="username" name="username" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                 </div>
                 <div class="input-group">
-                    <label for="password">Password:</label>
-                    <input type="password" id="password" name="password" required>
+                    <label for="password" class="block text-gray-700 text-sm font-semibold mb-2">Password:</label>
+                    <input type="password" id="password" name="password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
                 </div>
-                <button type="submit" class="button primary">Log In</button>
+                <button type="submit" class="button primary w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md">
+                    Log In
+                </button>
             </form>
         </div>
     </div>
