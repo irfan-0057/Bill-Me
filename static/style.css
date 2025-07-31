@@ -1,396 +1,183 @@
-Here's an updated version of your static/style.css designed to give it a more professional and modern look. I've focused on a refined color palette, improved typography, better spacing, subtle shadows, and smoother transitions.
-
 /* File: static/style.css */
 
-/* --- Variables for a consistent color palette --- */
-:root {
-    --primary-color: #20c997; /* A vibrant teal/mint green */
-    --primary-dark: #16a085;
-    --secondary-color: #34495e; /* Dark blue-gray for accents/sidebar */
-    --text-dark: #333333;
-    --text-light: #666666;
-    --background-light: #f8f9fa;
-    --background-medium: #e9ecef;
-    --white: #ffffff;
-    --border-color: #dee2e6;
-    --shadow-light: rgba(0, 0, 0, 0.08);
-    --shadow-medium: rgba(0, 0, 0, 0.15);
-    --danger-color: #dc3545;
-    --danger-dark: #c82333;
-}
-
-/* --- General Body and Layout --- */
+/* General Body and Layout */
 body {
-    font-family: 'Inter', sans-serif; /* Using a modern, clean sans-serif font */
+    font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
-    background-color: var(--background-light);
+    background-color: #f4f4f4;
     display: flex;
-    min-height: 100vh; /* Ensure body takes full viewport height */
-    color: var(--text-dark);
-    line-height: 1.6; /* Improved readability */
 }
 
-/* --- Sidebar --- */
+/* Sidebar */
 .sidebar {
-    width: 260px; /* Slightly wider */
-    background-color: var(--secondary-color);
-    color: var(--white);
-    padding: 25px 20px; /* More vertical padding */
+    width: 250px;
+    background-color: #2c3e50;
+    color: white;
+    padding: 20px;
     height: 100vh;
-    box-shadow: 3px 0 10px var(--shadow-medium); /* More pronounced shadow */
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
     display: flex;
     flex-direction: column;
-    position: sticky; /* Keep sidebar visible on scroll */
-    top: 0;
-    left: 0;
-    overflow-y: auto; /* Enable scrolling if content overflows */
 }
 
 .sidebar-item {
-    color: var(--white);
+    color: white;
     text-decoration: none;
-    padding: 15px 20px;
-    margin-bottom: 8px; /* Slightly less margin */
-    border-radius: 10px; /* More rounded corners */
-    transition: background-color 0.3s ease, transform 0.2s ease; /* Smooth transitions */
-    font-weight: 500; /* Medium font weight */
-    display: flex; /* For potential icons */
-    align-items: center;
-    gap: 10px; /* Space between icon and text */
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    transition: background-color 0.3s;
 }
 
 .sidebar-item:hover {
-    background-color: #49617a; /* Slightly lighter on hover */
-    transform: translateX(5px); /* Subtle slide effect */
+    background-color: #34495e;
 }
 
 .sidebar-item.active {
-    background-color: var(--primary-color);
-    box-shadow: 0 2px 5px var(--shadow-light); /* Subtle shadow for active item */
-    font-weight: 600; /* Bolder for active */
+    background-color: #1abc9c;
 }
 
-/* --- Main Content Area --- */
+/* Main Content Area */
 .content {
     flex-grow: 1;
-    padding: 30px; /* More padding around content */
-    background-color: var(--background-light);
+    padding: 20px;
 }
 
 .content h1 {
-    color: var(--text-dark);
-    font-size: 2.2em; /* Slightly larger heading */
-    margin-bottom: 25px; /* More space below heading */
-    padding-bottom: 15px;
-    border-bottom: 1px solid var(--border-color); /* Lighter border */
-    font-weight: 700; /* Bold heading */
+    color: #333;
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 10px;
 }
 
-/* --- Form and Table Styles --- */
+/* Form and Table Styles */
 .form-section, .table-container {
-    background-color: var(--white);
-    padding: 30px; /* More padding */
-    border-radius: 12px; /* More rounded corners */
-    box-shadow: 0 4px 10px var(--shadow-light); /* Softer shadow */
-    margin-bottom: 30px; /* More space between sections */
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
 }
 
 .input-group {
-    margin-bottom: 20px; /* More space between input groups */
+    margin-bottom: 15px;
 }
 
 .input-group label {
     display: block;
-    margin-bottom: 8px; /* More space below label */
-    font-weight: 600; /* Bolder labels */
-    color: var(--text-dark);
-    font-size: 0.95em; /* Slightly smaller label font */
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
 }
 
 .input-group input, .input-group select {
     width: 100%;
-    padding: 12px 15px; /* More padding inside inputs */
-    border: 1px solid var(--border-color);
-    border-radius: 8px; /* Rounded input fields */
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
     box-sizing: border-box;
-    font-size: 1em;
-    color: var(--text-dark);
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
-}
-
-.input-group input:focus, .input-group select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(32, 201, 151, 0.2); /* Subtle focus ring */
 }
 
 .button {
-    padding: 12px 25px; /* More padding for buttons */
+    padding: 10px 20px;
     border: none;
-    border-radius: 8px; /* Rounded buttons */
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 1em; /* Consistent font size */
-    font-weight: 600; /* Bolder button text */
+    font-size: 16px;
     text-decoration: none;
-    display: inline-flex; /* Use flex for potential icons in buttons */
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
-    box-shadow: 0 2px 5px var(--shadow-light); /* Subtle button shadow */
+    display: inline-block;
+    transition: background-color 0.3s;
 }
 
 .primary {
-    background-color: var(--primary-color);
-    color: var(--white);
+    background-color: #1abc9c;
+    color: white;
 }
 
 .primary:hover {
-    background-color: var(--primary-dark);
-    transform: translateY(-2px); /* Lift effect on hover */
-    box-shadow: 0 4px 8px var(--shadow-medium);
+    background-color: #16a085;
 }
 
 .danger {
-    background-color: var(--danger-color);
-    color: var(--white);
+    background-color: #e74c3c;
+    color: white;
 }
 
 .danger:hover {
-    background-color: var(--danger-dark);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px var(--shadow-medium);
+    background-color: #c0392b;
 }
 
 table {
     width: 100%;
-    border-collapse: separate; /* Use separate for rounded corners */
-    border-spacing: 0; /* Remove default spacing */
-    overflow: hidden; /* Ensures rounded corners apply to content */
-    border-radius: 12px; /* Rounded table corners */
+    border-collapse: collapse;
 }
 
 table th, table td {
-    border: 1px solid var(--border-color);
-    padding: 12px 15px; /* More padding in cells */
+    border: 1px solid #ddd;
+    padding: 8px;
     text-align: left;
-    font-size: 0.95em;
 }
 
 table th {
-    background-color: var(--background-medium);
-    color: var(--text-dark);
-    font-weight: 700;
-    text-transform: uppercase; /* Uppercase headers */
-    letter-spacing: 0.5px;
+    background-color: #f2f2f2;
 }
 
-table tr:nth-child(even) {
-    background-color: #fcfdff; /* Subtle stripe effect */
-}
-
-table tr:hover {
-    background-color: #f0f3f6; /* Highlight row on hover */
-}
-
-/* --- Login Page Specific Styles (from previous iteration, integrated) --- */
-.login-page {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    background-color: var(--background-medium); /* Slightly darker background for login */
-}
-
-.login-container {
-    background-color: var(--white);
-    padding: 40px; /* More padding for a substantial feel */
-    border-radius: 15px; /* More rounded corners */
-    box-shadow: 0 8px 20px var(--shadow-medium); /* Stronger shadow */
-    width: 100%;
-    max-width: 450px; /* Slightly wider login form */
-    text-align: center;
-}
-
-.login-container .dashboard-header {
-    margin-bottom: 30px; /* Adjusted margin for login header */
-}
-
-.login-container .dashboard-header .logo img {
-    width: 130px; /* Slightly larger logo on login page */
-    height: auto;
-    margin-bottom: 15px;
-    border-radius: 50%; /* Ensure it's perfectly round */
-    border: 5px solid var(--primary-color); /* Prominent border */
-}
-
-.login-container .dashboard-header h1 {
-    font-size: 2.8em; /* Adjusted size for login heading */
-    color: var(--secondary-color);
-    margin: 0;
-    border-bottom: none;
-}
-
-.login-container .dashboard-header p {
-    font-size: 1.1em;
-    color: var(--text-light);
-    margin-top: 10px;
-}
-
-/* --- New Dashboard Enhancements --- */
+/* New Dashboard Enhancements */
 .dashboard-header {
     text-align: center;
-    margin-bottom: 50px; /* More space below header */
+    margin-bottom: 40px;
 }
 
 .dashboard-header .logo img {
-    width: 180px; /* Larger logo for main dashboard */
+    width: 150px; /* Adjust size as needed */
     height: auto;
-    margin-bottom: 15px;
-    border-radius: 50%;
-    border: 6px solid var(--primary-color); /* Prominent border */
-    box-shadow: 0 4px 10px var(--shadow-light);
+    margin-bottom: 10px;
 }
 
 .dashboard-header h1 {
-    font-size: 3.5em; /* Larger, more impactful heading */
+    font-size: 3em;
     margin: 0;
-    color: var(--secondary-color);
+    color: #2c3e50;
     border-bottom: none;
-    font-weight: 800; /* Extra bold */
-    letter-spacing: -1px; /* Tighter letter spacing */
 }
 
 .dashboard-header p {
-    font-size: 1.3em;
-    color: var(--text-light);
-    margin-top: 10px;
+    font-size: 1.2em;
+    color: #7f8c8d;
 }
 
 .dashboard-main {
-    padding: 30px;
+    padding: 20px;
 }
 
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Slightly larger min-width */
-    gap: 35px; /* More space between cards */
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
 }
 
 .dashboard-card {
-    background-color: var(--white);
-    border-radius: 15px; /* More rounded corners */
-    box-shadow: 0 6px 15px var(--shadow-light); /* Softer, deeper shadow */
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     text-align: center;
-    padding: 45px 25px; /* More padding */
+    padding: 40px 20px;
     text-decoration: none;
-    color: var(--text-dark);
-    transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
-    display: flex; /* Use flex for vertical centering of content */
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    color: #333;
+    transition: transform 0.3s, box-shadow 0.3s;
 }
 
 .dashboard-card:hover {
-    transform: translateY(-8px); /* Lift effect */
-    box-shadow: 0 12px 25px var(--shadow-medium); /* More pronounced shadow on hover */
-    background-color: var(--background-medium); /* Subtle background change on hover */
+    transform: translateY(-10px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
 }
 
 .card-icon {
-    font-size: 65px; /* Slightly larger icon size */
-    margin-bottom: 20px; /* More space below icon */
-    color: var(--primary-color); /* Icon color */
+    font-size: 60px; /* Adjust icon size */
+    margin-bottom: 15px;
 }
 
 .card-text {
-    font-size: 1.6em; /* Slightly larger text */
-    font-weight: 700; /* Bolder text */
-    color: var(--secondary-color); /* Text color */
-}
-
-/* --- Responsive Adjustments --- */
-@media (max-width: 768px) {
-    body {
-        flex-direction: column; /* Stack sidebar and content on small screens */
-    }
-
-    .sidebar {
-        width: 100%;
-        height: auto;
-        padding: 15px 10px;
-        position: relative; /* No sticky on mobile */
-        box-shadow: 0 2px 5px var(--shadow-light);
-    }
-
-    .sidebar-item {
-        padding: 12px 15px;
-        margin-bottom: 5px;
-    }
-
-    .content {
-        padding: 20px;
-    }
-
-    .content h1 {
-        font-size: 1.8em;
-        margin-bottom: 20px;
-    }
-
-    .form-section, .table-container {
-        padding: 20px;
-        margin-bottom: 20px;
-    }
-
-    .login-container {
-        padding: 30px;
-        max-width: 90%;
-    }
-
-    .login-container .dashboard-header h1 {
-        font-size: 2.2em;
-    }
-
-    .dashboard-header h1 {
-        font-size: 2.5em;
-    }
-
-    .dashboard-header .logo img {
-        width: 120px;
-        border: 4px solid var(--primary-color);
-    }
-
-    .dashboard-grid {
-        grid-template-columns: 1fr; /* Single column on small screens */
-        gap: 25px;
-    }
-
-    .dashboard-card {
-        padding: 35px 20px;
-    }
-
-    .card-icon {
-        font-size: 55px;
-        margin-bottom: 15px;
-    }
-
-    .card-text {
-        font-size: 1.4em;
-    }
-}
-
-@media (max-width: 480px) {
-    .login-container {
-        padding: 20px;
-    }
-
-    .login-container .dashboard-header h1 {
-        font-size: 1.8em;
-    }
-
-    .dashboard-header h1 {
-        font-size: 2em;
-    }
+    font-size: 1.5em;
+    font-weight: bold;
 }
