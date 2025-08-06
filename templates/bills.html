@@ -79,11 +79,40 @@
                         <td>${bill.customer_name}</td>
                         <td>${bill.bill_date}</td>
                         <td>₹${bill.grand_total.toFixed(2)}</td>
-                        <td><a href="/view_bill/${bill.bill_number}" class="button primary" target="_blank">View</a></td>
+                        <td>
+                            <a href="/view_bill/${bill.bill_number}" class="button primary" target="_blank">View</a>
+                            <button class="button danger" onclick="cancelBill(${bill.bill_number})">Cancel</button>
+                        </td>
                     `;
                 });
             }
         });
+
+        // New JavaScript function to handle bill cancellation
+        function cancelBill(billNumber) {
+            if (confirm(`Are you sure you want to cancel bill number ${billNumber}? This action is irreversible and will restore products to inventory.`)) {
+                fetch(`/cancel_bill/${billNumber}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.success);
+                        // Refresh the page to show the updated bill list
+                        window.location.reload();
+                    } else {
+                        alert(`Error: ${data.error}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while trying to cancel the bill.');
+                });
+            }
+        }
     </script>
 </body>
 </html>
