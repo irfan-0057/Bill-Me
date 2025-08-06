@@ -12,72 +12,151 @@
         <a href="{{ url_for('inventory_selection') }}" class="sidebar-item">Inventory</a>
         <a href="{{ url_for('billing_selection') }}" class="sidebar-item">Billing</a>
         <a href="{{ url_for('bills') }}" class="sidebar-item">Bills</a>
-        <a href="{{ url_for('reports') }}" class="sidebar-item active">Reports</a>
+        <a href="{{ url_for('reports_selection') }}" class="sidebar-item active">Reports</a>
     </div>
 
     <div class="content">
-        <h1>Sales Reports</h1>
+        <h1>{{ product_type.capitalize() }} Reports</h1>
         <div class="form-section">
             <div class="report-form">
                 <div class="input-group">
                     <label for="reportType">Report Type:</label>
                     <select id="reportType">
-                        <option value="daily_sales">Daily Sales</option>
-                        <option value="monthly_sales">Monthly Sales</option>
-                        <option value="yearly_sales">Yearly Sales</option>
-                        <option value="total_sales">Total Sales</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label for="reportScope">Report Scope:</label>
-                    <select id="reportScope">
-                        <option value="total">Total Products</option>
-                        <option value="product_wise">Product-wise</option>
+                        <option value="daily">Daily Sales</option>
+                        <option value="monthly">Monthly Sales</option>
+                        <option value="yearly">Yearly Sales</option>
+                        <option value="total_sales_productwise">Total Sales (Product-wise)</option>
+                        <option value="num_products_sold">Number of Products Sold</option>
                     </select>
                 </div>
                 <div class="input-group">
                     <label for="startDate">Start Date:</label>
-                    <input type="date" id="startDate" required>
+                    <input type="date" id="startDate">
                 </div>
                 <div class="input-group">
                     <label for="endDate">End Date:</label>
-                    <input type="date" id="endDate" required>
+                    <input type="date" id="endDate">
                 </div>
-                <button id="generateReportBtn" class="button primary">Generate PDF Report</button>
+                <div class="input-group" id="product-filter-group">
+                    <label for="productFilter">Filter by Product:</label>
+                    <select id="productFilter">
+                        <option value="all">All Products</option>
+                        {% for product in products %}
+                            <option value="{{ product }}">{{ product }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button id="generateReportBtn" class="button primary">Generate Report</button>
             </div>
+        </div>
+
+        <div id="report-output" style="display:none;">
+            <h2 id="report-title"></h2>
+            <table id="report-table">
+                <thead></thead>
+                <tbody></tbody>
+            </table>
         </div>
     </div>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const reportTypeSelect = document.getElementById('reportType');
-            const reportScopeSelect = document.getElementById('reportScope');
             const startDateInput = document.getElementById('startDate');
             const endDateInput = document.getElementById('endDate');
+            const productFilterSelect = document.getElementById('productFilter');
             const generateReportBtn = document.getElementById('generateReportBtn');
+            const reportOutputDiv = document.getElementById('report-output');
+            const reportTitleEl = document.getElementById('report-title');
+            const reportTableHead = document.querySelector('#report-table thead');
+            const reportTableBody = document.querySelector('#report-table tbody');
+            const productFilterGroup = document.getElementById('product-filter-group');
 
-            // Set default date to today
             const today = new Date().toISOString().split('T')[0];
             startDateInput.value = today;
             endDateInput.value = today;
 
-            generateReportBtn.addEventListener('click', function() {
+            generateReportBtn.addEventListener('click', async function() {
                 const reportType = reportTypeSelect.value;
-                const reportScope = reportScopeSelect.value;
                 const startDate = startDateInput.value;
                 const endDate = endDateInput.value;
+                const product = productFilterSelect.value;
+                const productType = "{{ product_type }}";
 
-                if (!startDate || !endDate) {
-                    alert('Please select both a start and an end date.');
+                const url = `/sales_report?type=${reportType}&start_date=${startDate}&end_date=${endDate}&product=${product}&product_type=${productType}`;
+
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok.');
+                    }
+                    const data = await response.json();
+                    displayReport(data, reportType);
+                } catch (error) {
+                    console.error('Error fetching report:', error);
+                    reportOutputDiv.style.display = 'block';
+                    reportTitleEl.textContent = 'Error fetching report.';
+                    reportTableHead.innerHTML = '';
+                    reportTableBody.innerHTML = '';
+                }
+            });
+
+            function displayReport(data, reportType) {
+                reportOutputDiv.style.display = 'block';
+                reportTableHead.innerHTML = '';
+                reportTableBody.innerHTML = '';
+
+                let title = '';
+                let headers = [];
+
+                if (reportType === 'daily' || reportType === 'monthly' || reportType === 'yearly') {
+                    title = 'Sales Report by Period';
+                    headers = ['Period', 'Total Sales (₹)'];
+                } else if (reportType === 'total_sales_productwise') {
+                    title = 'Total Sales Product-wise';
+                    headers = ['Product Name', 'Total Qty Sold', 'Total Sales (₹)'];
+                } else if (reportType === 'num_products_sold') {
+                    title = 'Number of Products Sold';
+                    headers = ['Product Name', 'Total Qty Sold'];
+                }
+
+                reportTitleEl.textContent = title;
+                const headerRow = reportTableHead.insertRow();
+                headers.forEach(headerText => {
+                    const th = document.createElement('th');
+                    th.textContent = headerText;
+                    headerRow.appendChild(th);
+                });
+
+                if (data.length === 0) {
+                    const row = reportTableBody.insertRow();
+                    const cell = row.insertCell();
+                    cell.colSpan = headers.length;
+                    cell.textContent = 'No data found for the selected criteria.';
                     return;
                 }
 
-                // Construct the URL to the new sales_report API endpoint
-                const url = `/sales_report?type=${reportType}&scope=${reportScope}&start_date=${startDate}&end_date=${endDate}`;
-
-                // Open the URL in a new tab, which will trigger the PDF download/view
-                window.open(url, '_blank');
-            });
+                data.forEach(item => {
+                    const row = reportTableBody.insertRow();
+                    if (reportType === 'total_sales_productwise') {
+                        row.innerHTML = `
+                            <td>${item.product_name}</td>
+                            <td>${item.total_qty}</td>
+                            <td>₹${item.total_sales.toFixed(2)}</td>
+                        `;
+                    } else if (reportType === 'num_products_sold') {
+                        row.innerHTML = `
+                            <td>${item.product_name}</td>
+                            <td>${item.total_qty}</td>
+                        `;
+                    } else {
+                        row.innerHTML = `
+                            <td>${item.period}</td>
+                            <td>₹${item.total_sales.toFixed(2)}</td>
+                        `;
+                    }
+                });
+            }
         });
     </script>
 </body>
