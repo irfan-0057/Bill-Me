@@ -258,6 +258,62 @@ def get_bills():
     logging.info(f"Fetched {len(bills_list)} bills for display.")
     return jsonify(bills_list)
 
+
+# New route to handle bill cancellation
+@app.route('/cancel_bill/<int:bill_number>', methods=['POST'])
+@login_required
+@admin_only
+def cancel_bill(bill_number):
+    """
+    Cancels a bill, reverts the stock quantities, and deletes the bill and its items.
+    """
+    try:
+        # Start a database transaction
+        bill = Bill.query.filter_by(bill_number=bill_number).first()
+        if not bill:
+            logging.warning(f"Attempted to cancel non-existent bill number: {bill_number}")
+            return jsonify({'error': 'Bill not found.'}), 404
+
+        bill_items = BillItem.query.filter_by(bill_id=bill.id).all()
+        if not bill_items:
+            logging.warning(f"Bill {bill_number} found but has no items to revert.")
+            db.session.delete(bill)
+            db.session.commit()
+            return jsonify({'success': f'Bill {bill_number} cancelled (no items to revert).'}), 200
+        
+        # Revert stock quantities
+        for item in bill_items:
+            product = Product.query.filter_by(name=item.product_name).first()
+            if product:
+                product.stock_qty += item.qty
+                db.session.add(product) # Mark product for update
+                logging.info(f"Reverted stock for product '{product.name}': +{item.qty}")
+            else:
+                logging.error(f"Product '{item.product_name}' not found during cancellation of bill {bill_number}.")
+                # Rollback if a product is missing to maintain data integrity
+                raise ValueError(f"Product '{item.product_name}' not found in inventory.")
+
+        # Delete the bill items and the bill header
+        for item in bill_items:
+            db.session.delete(item)
+            
+        db.session.delete(bill)
+        
+        # Commit the transaction
+        db.session.commit()
+        logging.info(f"Bill {bill_number} and associated items successfully cancelled. Stock quantities reverted.")
+        return jsonify({'success': 'Bill cancelled successfully. Stock has been reverted.'}), 200
+
+    except ValueError as ve:
+        db.session.rollback()
+        logging.error(f"Error during bill cancellation for {bill_number}: {ve}")
+        return jsonify({'error': str(ve)}), 500
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Unexpected error cancelling bill {bill_number}: {e}", exc_info=True)
+        return jsonify({'error': 'An unexpected error occurred.'}), 500
+
+
 # Route for inventory selection page
 @app.route('/inventory')
 @login_required
@@ -990,5 +1046,3 @@ def update_user():
         logging.error(f"Error updating user ID {user_id}: {e}")
         return jsonify({'error': str(e)}), 500
     return redirect(url_for('user_management'))
-
-
