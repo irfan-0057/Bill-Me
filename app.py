@@ -775,35 +775,22 @@ def view_bill(bill_number):
 @app.route('/reports')
 @login_required
 @admin_only
-def reports_selection():
-    return render_template('reports_selection.html')
+def reports():
+    return render_template('reports.html')
     
-# New route to handle the actual reports page
-@app.route('/reports/<product_type>')
-@login_required
-@admin_only
-def reports(product_type):
-    products = []
-    try:
-        # New: Query products using SQLAlchemy
-        products_data = Product.query.filter_by(product_type=product_type).order_by(Product.name.asc()).all()
-        products = [p.name for p in products_data]
-        logging.info(f"Fetched {len(products)} products for reports of type '{product_type}'.")
-    except Exception as e:
-        logging.error(f"Error fetching products for reports '{product_type}': {e}")
-    
-    return render_template('reports.html', products=products, product_type=product_type)
-
-# API endpoint for sales reports generation
+# Updated API endpoint for sales reports generation
 @app.route('/sales_report', methods=['GET'])
 @login_required
 @admin_only
 def sales_report():
     report_type = request.args.get('type')
+    report_scope = request.args.get('scope') # 'total' or 'product_wise'
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
-    product_name = request.args.get('product')
-    product_type_filter = request.args.get('product_type')
+
+    if not all([report_type, report_scope, start_date_str, end_date_str]):
+        logging.warning("Missing parameters for sales report generation.")
+        return jsonify({'error': 'Missing parameters: type, scope, start_date, end_date are required.'}), 400
 
     try:
         start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
@@ -811,54 +798,94 @@ def sales_report():
     except ValueError:
         logging.warning(f"Invalid date format for sales report: start={start_date_str}, end={end_date_str}")
         return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD.'}), 400
-
-    query = db.session.query(BillItem, Bill, Product).join(Bill, BillItem.bill_id == Bill.id).join(Product, BillItem.product_name == Product.name).filter(
+    
+    # Base query filters on the date range
+    query = db.session.query(BillItem, Bill).join(Bill, BillItem.bill_id == Bill.id).filter(
         Bill.bill_date.between(start_date, end_date)
     )
 
-    if product_name and product_name != 'all':
-        query = query.filter(BillItem.product_name == product_name)
+    report_title = f"Sales Report - {start_date_str} to {end_date_str}"
+    report_data = []
 
-    if product_type_filter and product_type_filter != 'all':
-        query = query.filter(Product.product_type == product_type_filter)
+    # New logic for simplified report types
+    if report_type == 'daily_sales':
+        report_title = f"Daily Sales Report - {start_date_str} to {end_date_str}"
+        if report_scope == 'total':
+            results = query.group_by(Bill.bill_date).order_by(Bill.bill_date).with_entities(
+                Bill.bill_date.label('period'), func.sum(BillItem.amount).label('total_sales')
+            ).all()
+            report_data = [{'period': r.period.strftime('%Y-%m-%d'), 'total_sales': r.total_sales} for r in results]
+        elif report_scope == 'product_wise':
+            results = query.group_by(Bill.bill_date, BillItem.product_name).order_by(Bill.bill_date, BillItem.product_name).with_entities(
+                Bill.bill_date.label('period'), BillItem.product_name, func.sum(BillItem.amount).label('total_sales')
+            ).all()
+            report_data = [{'period': r.period.strftime('%Y-%m-%d'), 'product_name': r.product_name, 'total_sales': r.total_sales} for r in results]
 
-    results = []
-    if report_type == 'daily':
-        results = query.group_by(Bill.bill_date).order_by(Bill.bill_date).with_entities(
-            Bill.bill_date.label('period'), func.sum(BillItem.amount).label('total_sales')
-        ).all()
-        report_data = [{'period': r.period.strftime('%Y-%m-%d'), 'total_sales': r.total_sales} for r in results]
+    elif report_type == 'monthly_sales':
+        report_title = f"Monthly Sales Report - {start_date_str} to {end_date_str}"
+        if report_scope == 'total':
+            results = query.group_by(func.strftime('%Y-%m', Bill.bill_date)).order_by(func.strftime('%Y-%m', Bill.bill_date)).with_entities(
+                func.strftime('%Y-%m', Bill.bill_date).label('period'), func.sum(BillItem.amount).label('total_sales')
+            ).all()
+            report_data = [{'period': r.period, 'total_sales': r.total_sales} for r in results]
+        elif report_scope == 'product_wise':
+            results = query.group_by(func.strftime('%Y-%m', Bill.bill_date), BillItem.product_name).order_by(func.strftime('%Y-%m', Bill.bill_date), BillItem.product_name).with_entities(
+                func.strftime('%Y-%m', Bill.bill_date).label('period'), BillItem.product_name, func.sum(BillItem.amount).label('total_sales')
+            ).all()
+            report_data = [{'period': r.period, 'product_name': r.product_name, 'total_sales': r.total_sales} for r in results]
 
-    elif report_type == 'monthly':
-        results = query.group_by(func.strftime('%Y-%m', Bill.bill_date)).order_by(func.strftime('%Y-%m', Bill.bill_date)).with_entities(
-            func.strftime('%Y-%m', Bill.bill_date).label('period'), func.sum(BillItem.amount).label('total_sales')
-        ).all()
-        report_data = [{'period': r.period, 'total_sales': r.total_sales} for r in results]
-
-    elif report_type == 'yearly':
-        results = query.group_by(func.strftime('%Y', Bill.bill_date)).order_by(func.strftime('%Y', Bill.bill_date)).with_entities(
-            func.strftime('%Y', Bill.bill_date).label('period'), func.sum(BillItem.amount).label('total_sales')
-        ).all()
-        report_data = [{'period': r.period, 'total_sales': r.total_sales} for r in results]
-
-    elif report_type == 'total_sales_productwise':
-        results = query.group_by(BillItem.product_name).order_by(BillItem.product_name).with_entities(
-            BillItem.product_name, func.sum(BillItem.qty).label('total_qty'), func.sum(BillItem.amount).label('total_sales')
-        ).all()
-        report_data = [{'product_name': r.product_name, 'total_qty': r.total_qty, 'total_sales': r.total_sales} for r in results]
-
-    elif report_type == 'num_products_sold':
-        results = query.group_by(BillItem.product_name).order_by(BillItem.product_name).with_entities(
-            BillItem.product_name, func.sum(BillItem.qty).label('total_qty')
-        ).all()
-        report_data = [{'product_name': r.product_name, 'total_qty': r.total_qty} for r in results]
-
+    elif report_type == 'yearly_sales':
+        report_title = f"Yearly Sales Report - {start_date_str} to {end_date_str}"
+        if report_scope == 'total':
+            results = query.group_by(func.strftime('%Y', Bill.bill_date)).order_by(func.strftime('%Y', Bill.bill_date)).with_entities(
+                func.strftime('%Y', Bill.bill_date).label('period'), func.sum(BillItem.amount).label('total_sales')
+            ).all()
+            report_data = [{'period': r.period, 'total_sales': r.total_sales} for r in results]
+        elif report_scope == 'product_wise':
+            results = query.group_by(func.strftime('%Y', Bill.bill_date), BillItem.product_name).order_by(func.strftime('%Y', Bill.bill_date), BillItem.product_name).with_entities(
+                func.strftime('%Y', Bill.bill_date).label('period'), BillItem.product_name, func.sum(BillItem.amount).label('total_sales')
+            ).all()
+            report_data = [{'period': r.period, 'product_name': r.product_name, 'total_sales': r.total_sales} for r in results]
+            
+    elif report_type == 'total_sales':
+        report_title = f"Total Sales Report - {start_date_str} to {end_date_str}"
+        if report_scope == 'total':
+            results = query.with_entities(func.sum(BillItem.amount).label('total_sales')).first()
+            total_sales = results.total_sales if results and results.total_sales is not None else 0
+            report_data = [{'total_sales': total_sales}]
+        elif report_scope == 'product_wise':
+            results = query.group_by(BillItem.product_name).order_by(BillItem.product_name).with_entities(
+                BillItem.product_name, func.sum(BillItem.amount).label('total_sales')
+            ).all()
+            report_data = [{'product_name': r.product_name, 'total_sales': r.total_sales} for r in results]
+            
     else:
         logging.warning(f"Invalid report type requested: {report_type}")
         return jsonify({'error': 'Invalid report type'}), 400
 
-    logging.info(f"Generated sales report '{report_type}' with {len(report_data)} rows.")
-    return jsonify(report_data), 200
+    logging.info(f"Generated sales report '{report_type}' with scope '{report_scope}' and {len(report_data)} rows.")
+
+    # Render the HTML template for the PDF report
+    html_string = render_template(
+        'reports_template.html',
+        report_title=report_title,
+        report_data=report_data,
+        report_type=report_type,
+        report_scope=report_scope,
+        start_date=start_date_str,
+        end_date=end_date_str
+    )
+
+    # Convert the HTML string to a PDF
+    pdf_bytes = HTML(string=html_string).write_pdf()
+
+    # Serve the PDF to the user
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f"{report_type}_{report_scope}_{start_date_str}_to_{end_date_str}.pdf"
+    )
 
 # New routes for invoice management
 @app.route('/upload_invoice_form')
