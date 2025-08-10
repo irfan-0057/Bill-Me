@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bismilla Traders - Bill Search</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Bismilla Traders - Bills ({{ product_type }})</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -11,18 +11,20 @@
         <a href="{{ url_for('dashboard') }}" class="sidebar-item">Dashboard</a>
         <a href="{{ url_for('inventory_selection') }}" class="sidebar-item">Inventory</a>
         <a href="{{ url_for('billing_selection') }}" class="sidebar-item">Billing</a>
-        <a href="{{ url_for('bills_selection') }}" class="sidebar-item active">Bills</a>
+        <a href="{{ url_for('bills') }}" class="sidebar-item">Bills</a>
         <a href="{{ url_for('reports_selection') }}" class="sidebar-item">Reports</a>
     </div>
 
     <div class="content">
-        <h1>Bills History - {{ product_type.capitalize() }}</h1>
+        <h1>Bills - {{ product_type.capitalize() }}</h1>
+
         <div class="form-section">
             <div class="input-group">
-                <label for="billSearch">Search by Bill Number / Customer:</label>
-                <input type="text" id="billSearch" placeholder="Enter Bill Number or Customer Name">
+                <label for="billSearch">Search (Bill #, Customer, Date):</label>
+                <input id="billSearch" type="text" placeholder="Search...">
             </div>
         </div>
+
         <div class="table-container">
             <h2>All Bills</h2>
             <table id="bills-table">
@@ -35,94 +37,85 @@
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody id="bills-table-body">
-                </tbody>
+                <tbody id="bills-table-body"></tbody>
             </table>
-            <p id="no-results-message" style="display: none;">No bills found.</p>
+            <p id="no-results-message" style="display:none;">No bills found.</p>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', async function() {
-            const productType = "{{ product_type }}";
-            const billSearchInput = document.getElementById('billSearch');
-            const billsTableBody = document.getElementById('bills-table-body');
-            const noResultsMessage = document.getElementById('no-results-message');
-            let allBills = [];
+    document.addEventListener('DOMContentLoaded', async () => {
+        const productType = "{{ product_type }}";
+        const billsTableBody = document.getElementById('bills-table-body');
+        const searchInput = document.getElementById('billSearch');
+        const noResults = document.getElementById('no-results-message');
+        let allBills = [];
 
-            async function loadBills() {
-                try {
-                    const response = await fetch(`/get_bills?product_type=${productType}`);
-                    allBills = await response.json();
-                    renderBills(allBills);
-                } catch (error) {
-                    console.error('Error fetching bills:', error);
-                    billsTableBody.innerHTML = '<tr><td colspan="5">Error loading bills.</td></tr>';
-                }
+        async function loadBills() {
+            try {
+                const res = await fetch(`/get_bills?product_type=${productType}`);
+                allBills = await res.json();
+                render(allBills);
+            } catch (err) {
+                console.error(err);
+                billsTableBody.innerHTML = '<tr><td colspan="5">Error loading bills.</td></tr>';
             }
+        }
 
-            loadBills();
-
-            billSearchInput.addEventListener('input', function() {
-                const searchTerm = billSearchInput.value.trim().toLowerCase();
-                const filteredBills = allBills.filter(bill =>
-                    String(bill.bill_number).startsWith(searchTerm) ||
-                    bill.customer_name.toLowerCase().includes(searchTerm) ||
-                    bill.bill_date.includes(searchTerm)
-                );
-                renderBills(filteredBills);
-            });
-
-            function renderBills(bills) {
-                billsTableBody.innerHTML = '';
-                if (!Array.isArray(bills) || bills.length === 0) {
-                    noResultsMessage.style.display = 'block';
-                    return;
-                }
-                noResultsMessage.style.display = 'none';
-
-                bills.forEach(bill => {
-                    const row = billsTableBody.insertRow();
-                    row.innerHTML = `
-                        <td>${bill.bill_number}</td>
-                        <td>${bill.customer_name}</td>
-                        <td>${bill.bill_date}</td>
-                        <td>₹${Number(bill.grand_total).toFixed(2)}</td>
-                        <td>
-                            <a href="/view_bill/${bill.bill_number}" class="button primary" target="_blank">View</a>
-                            {% if g.role == 'admin' %}
-                            <button class="button danger" onclick="cancelBill(${bill.bill_number})">Cancel</button>
-                            {% endif %}
-                        </td>
-                    `;
-                });
-            }
-        });
-
-        // Cancel bill (admin only)
-        function cancelBill(billNumber) {
-            if (!confirm(`Are you sure you want to cancel bill number ${billNumber}? This action is irreversible and will restore products to inventory.`)) {
+        function render(bills) {
+            billsTableBody.innerHTML = '';
+            if (!Array.isArray(bills) || bills.length === 0) {
+                noResults.style.display = 'block';
                 return;
             }
-            fetch(`/cancel_bill/${billNumber}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(async res => {
-                const data = await res.json();
-                if (res.ok && data.success) {
+            noResults.style.display = 'none';
+            bills.forEach(b => {
+                const row = billsTableBody.insertRow();
+                row.innerHTML = `
+                    <td>${b.bill_number}</td>
+                    <td>${b.customer_name}</td>
+                    <td>${b.bill_date}</td>
+                    <td>₹${Number(b.grand_total).toFixed(2)}</td>
+                    <td>
+                        <a class="button primary" href="/view_bill/${b.bill_number}" target="_blank">View</a>
+                        {% if g.role == 'admin' %}
+                        <button class="button danger" onclick="cancelBill(${b.bill_number})">Cancel</button>
+                        {% endif %}
+                    </td>
+                `;
+            });
+        }
+
+        searchInput.addEventListener('input', () => {
+            const q = searchInput.value.trim().toLowerCase();
+            const filtered = allBills.filter(b =>
+                String(b.bill_number).startsWith(q) ||
+                b.customer_name.toLowerCase().includes(q) ||
+                b.bill_date.includes(q)
+            );
+            render(filtered);
+        });
+
+        await loadBills();
+    });
+
+    function cancelBill(billNumber) {
+        if (!confirm(`Cancel bill ${billNumber}? This will revert stock and permanently renumber bills.`)) return;
+        fetch(`/cancel_bill/${billNumber}`, { method: 'POST', headers: {'Content-Type':'application/json'} })
+            .then(async r => {
+                const data = await r.json();
+                if (r.ok && data.success) {
                     alert(data.success);
-                    // Reload page to get updated renumbered list
                     window.location.reload();
                 } else {
-                    alert(`Error: ${data.error || 'Unknown error'}`);
+                    alert('Error: ' + (data.error || 'Unknown'));
                 }
             })
             .catch(err => {
-                console.error('Cancel error:', err);
-                alert('An error occurred while trying to cancel the bill.');
+                console.error(err);
+                alert('Error cancelling bill');
             });
-        }
+    }
     </script>
 </body>
 </html>
