@@ -134,6 +134,33 @@ class Invoice(db.Model):
 
 # --- End SQLAlchemy Models ---
 
+# Helper function to renumber all bills sequentially from 1
+def renumber_bills():
+    """
+    Permanently renumbers bills in the database starting from 1,
+    ordered by bill_date asc then id asc (oldest first).
+    Updates Setting 'last_bill_number' accordingly.
+    """
+    try:
+        remaining_bills = Bill.query.order_by(Bill.bill_date.asc(), Bill.id.asc()).all()
+        new_number = 1
+        for b in remaining_bills:
+            b.bill_number = new_number
+            new_number += 1
+        db.session.commit()
+
+        # Update last_bill_number in settings
+        last_bill_number_setting = Setting.query.filter_by(key='last_bill_number').first()
+        if last_bill_number_setting:
+            last_bill_number_setting.value = new_number - 1
+            db.session.add(last_bill_number_setting)
+            db.session.commit()
+
+        logging.info(f"Renumbered all bills from 1 to {new_number - 1} successfully.")
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error while renumbering bills: {e}", exc_info=True)
+
 # Function to initialize the database: create tables and seed initial data
 def init_db():
     with app.app_context():
@@ -161,6 +188,12 @@ def init_db():
 
         db.session.commit()
         logging.info("Database initialization complete (models created and data seeded).")
+
+        # Always renumber bills on startup to ensure sequence is correct
+        try:
+            renumber_bills()
+        except Exception:
+            logging.exception("Renumber check on startup failed (continuing).")
 
         # Create temp directory for PDFs if it doesn't exist
         if not os.path.exists('temp'):
@@ -234,75 +267,92 @@ def logout():
 def dashboard():
     return render_template('dashboard.html')
 
-# Route for bills selection page
+# --- BILLS selection & listing routes (new) ---
+
+# Bills selection page (shows fertilizer / pesticide cards)
 @app.route('/bills')
 @login_required
-def bills():
-    return render_template('bills.html')
+def bills_selection():
+    return render_template('bills_selection.html')
 
-# API endpoint to get all bills for searching
+# Bills by product type page (renders the filtered bills template)
+@app.route('/bills/<product_type>')
+@login_required
+def bills_by_type(product_type):
+    # Validate product_type minimally
+    if product_type not in ['fertilizer', 'pesticide']:
+        # fallback to general bills page
+        return redirect(url_for('bills_selection'))
+    return render_template('bills.html', product_type=product_type)
+
+# API endpoint to get bills (optionally filtered by product_type)
 @app.route('/get_bills')
 @login_required
 def get_bills():
-    # New: Use SQLAlchemy to fetch all bills
-    bills_data = Bill.query.order_by(Bill.bill_number.desc()).all()
+    product_type = request.args.get('product_type')
+    try:
+        if product_type in ['fertilizer', 'pesticide']:
+            # Query bills that have at least one BillItem linked to a Product of given type
+            bills_query = db.session.query(Bill).join(BillItem, Bill.id == BillItem.bill_id).join(
+                Product, BillItem.product_name == Product.name
+            ).filter(Product.product_type == product_type).distinct().order_by(Bill.bill_number.desc())
+            bills_data = bills_query.all()
+        else:
+            bills_data = Bill.query.order_by(Bill.bill_number.desc()).all()
 
-    bills_list = []
-    for bill in bills_data:
-        bills_list.append({
-            'bill_number': bill.bill_number,
-            'customer_name': bill.customer_name,
-            'bill_date': bill.bill_date.strftime('%Y-%m-%d'), # Format date for JSON
-            'grand_total': bill.grand_total
-        })
-    logging.info(f"Fetched {len(bills_list)} bills for display.")
-    return jsonify(bills_list)
+        bills_list = []
+        for bill in bills_data:
+            bills_list.append({
+                'bill_number': bill.bill_number,
+                'customer_name': bill.customer_name,
+                'bill_date': bill.bill_date.strftime('%Y-%m-%d'),
+                'grand_total': bill.grand_total
+            })
+        logging.info(f"Fetched {len(bills_list)} bills for display (product_type={product_type}).")
+        return jsonify(bills_list)
+    except Exception as e:
+        logging.error(f"Error fetching bills (product_type={product_type}): {e}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch bills.'}), 500
 
 
-# New route to handle bill cancellation
+# New route to handle bill cancellation (permanent deletion + renumber)
 @app.route('/cancel_bill/<int:bill_number>', methods=['POST'])
 @login_required
 @admin_only
 def cancel_bill(bill_number):
     """
-    Cancels a bill, reverts the stock quantities, and deletes the bill and its items.
+    Cancels a bill, reverts the stock quantities, deletes the bill and its items,
+    then renumbers all remaining bills starting from 1 (permanent change).
     """
     try:
-        # Start a database transaction
         bill = Bill.query.filter_by(bill_number=bill_number).first()
         if not bill:
             logging.warning(f"Attempted to cancel non-existent bill number: {bill_number}")
             return jsonify({'error': 'Bill not found.'}), 404
 
         bill_items = BillItem.query.filter_by(bill_id=bill.id).all()
-        if not bill_items:
-            logging.warning(f"Bill {bill_number} found but has no items to revert.")
-            db.session.delete(bill)
-            db.session.commit()
-            return jsonify({'success': f'Bill {bill_number} cancelled (no items to revert).'}), 200
-        
-        # Revert stock quantities
-        for item in bill_items:
-            product = Product.query.filter_by(name=item.product_name).first()
-            if product:
-                product.stock_qty += item.qty
-                db.session.add(product) # Mark product for update
-                logging.info(f"Reverted stock for product '{product.name}': +{item.qty}")
-            else:
-                logging.error(f"Product '{item.product_name}' not found during cancellation of bill {bill_number}.")
-                # Rollback if a product is missing to maintain data integrity
-                raise ValueError(f"Product '{item.product_name}' not found in inventory.")
+        if bill_items:
+            # Revert stock quantities and delete bill items
+            for item in bill_items:
+                product = Product.query.filter_by(name=item.product_name).first()
+                if product:
+                    product.stock_qty += item.qty
+                    db.session.add(product)
+                    logging.info(f"Reverted stock for product '{product.name}': +{item.qty}")
+                else:
+                    logging.error(f"Product '{item.product_name}' not found during cancellation of bill {bill_number}.")
+                    raise ValueError(f"Product '{item.product_name}' not found in inventory.")
+                db.session.delete(item)
 
-        # Delete the bill items and the bill header
-        for item in bill_items:
-            db.session.delete(item)
-            
+        # Delete the bill itself
         db.session.delete(bill)
-        
-        # Commit the transaction
-        db.session.commit()
-        logging.info(f"Bill {bill_number} and associated items successfully cancelled. Stock quantities reverted.")
-        return jsonify({'success': 'Bill cancelled successfully. Stock has been reverted.'}), 200
+        db.session.commit()  # commit deletion
+
+        # Permanently renumber all bills
+        renumber_bills()
+
+        logging.info(f"Bill {bill_number} cancelled and bills renumbered.")
+        return jsonify({'success': 'Bill cancelled successfully. Bills renumbered.'}), 200
 
     except ValueError as ve:
         db.session.rollback()
@@ -313,6 +363,8 @@ def cancel_bill(bill_number):
         logging.error(f"Unexpected error cancelling bill {bill_number}: {e}", exc_info=True)
         return jsonify({'error': 'An unexpected error occurred.'}), 500
 
+
+# --- Inventory routes remain unchanged ---
 
 # Route for inventory selection page
 @app.route('/inventory')
@@ -394,7 +446,7 @@ def add_product_web():
         db.session.rollback() # Rollback on error
         logging.error(f"Error adding product: {e}")
         # Check for unique constraint violation (product name)
-        if "UNIQUE constraint failed: products.name" in str(e):
+        if "UNIQUE constraint failed: products.name" in str(e) or 'UNIQUE constraint' in str(e):
              return jsonify({'error': 'Product name already exists.'}), 400
         return jsonify({'error': str(e)}), 400
 
@@ -464,7 +516,7 @@ def update_product():
         db.session.rollback() # Rollback on error
         logging.error(f"Error updating product ID {product_id}: {e}")
         # Check for unique constraint violation (product name)
-        if "UNIQUE constraint failed: products.name" in str(e):
+        if "UNIQUE constraint failed: products.name" in str(e) or 'UNIQUE constraint' in str(e):
              return jsonify({'error': 'Product name already exists.'}), 400
         return jsonify({'error': str(e)}), 400
         
