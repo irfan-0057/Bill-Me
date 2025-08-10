@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Bismilla Traders - Bills ({{ product_type }})</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bismilla Traders - Bill Search</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -11,20 +11,18 @@
         <a href="{{ url_for('dashboard') }}" class="sidebar-item">Dashboard</a>
         <a href="{{ url_for('inventory_selection') }}" class="sidebar-item">Inventory</a>
         <a href="{{ url_for('billing_selection') }}" class="sidebar-item">Billing</a>
-        <a href="{{ url_for('bills') }}" class="sidebar-item">Bills</a>
+        <a href="{{ url_for('bills') }}" class="sidebar-item active">Bills</a>
         <a href="{{ url_for('reports_selection') }}" class="sidebar-item">Reports</a>
     </div>
 
     <div class="content">
-        <h1>Bills - {{ product_type.capitalize() }}</h1>
-
+        <h1>Bills History</h1>
         <div class="form-section">
             <div class="input-group">
-                <label for="billSearch">Search (Bill #, Customer, Date):</label>
-                <input id="billSearch" type="text" placeholder="Search...">
+                <label for="billSearch">Search by Bill Number:</label>
+                <input type="number" id="billSearch" placeholder="Enter Bill Number">
             </div>
         </div>
-
         <div class="table-container">
             <h2>All Bills</h2>
             <table id="bills-table">
@@ -37,85 +35,84 @@
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody id="bills-table-body"></tbody>
+                <tbody id="bills-table-body">
+                    </tbody>
             </table>
-            <p id="no-results-message" style="display:none;">No bills found.</p>
+            <p id="no-results-message" style="display: none;">No bills found with that number.</p>
         </div>
     </div>
 
     <script>
-    document.addEventListener('DOMContentLoaded', async () => {
-        const productType = "{{ product_type }}";
-        const billsTableBody = document.getElementById('bills-table-body');
-        const searchInput = document.getElementById('billSearch');
-        const noResults = document.getElementById('no-results-message');
-        let allBills = [];
+        document.addEventListener('DOMContentLoaded', async function() {
+            const billSearchInput = document.getElementById('billSearch');
+            const billsTableBody = document.getElementById('bills-table-body');
+            const noResultsMessage = document.getElementById('no-results-message');
+            let allBills = [];
 
-        async function loadBills() {
             try {
-                const res = await fetch(`/get_bills?product_type=${productType}`);
-                allBills = await res.json();
-                render(allBills);
-            } catch (err) {
-                console.error(err);
+                const response = await fetch('/get_bills');
+                allBills = await response.json();
+                renderBills(allBills);
+            } catch (error) {
+                console.error('Error fetching bills:', error);
                 billsTableBody.innerHTML = '<tr><td colspan="5">Error loading bills.</td></tr>';
             }
-        }
 
-        function render(bills) {
-            billsTableBody.innerHTML = '';
-            if (!Array.isArray(bills) || bills.length === 0) {
-                noResults.style.display = 'block';
-                return;
-            }
-            noResults.style.display = 'none';
-            bills.forEach(b => {
-                const row = billsTableBody.insertRow();
-                row.innerHTML = `
-                    <td>${b.bill_number}</td>
-                    <td>${b.customer_name}</td>
-                    <td>${b.bill_date}</td>
-                    <td>₹${Number(b.grand_total).toFixed(2)}</td>
-                    <td>
-                        <a class="button primary" href="/view_bill/${b.bill_number}" target="_blank">View</a>
-                        {% if g.role == 'admin' %}
-                        <button class="button danger" onclick="cancelBill(${b.bill_number})">Cancel</button>
-                        {% endif %}
-                    </td>
-                `;
+            billSearchInput.addEventListener('input', function() {
+                const searchTerm = billSearchInput.value.trim();
+                const filteredBills = allBills.filter(bill => String(bill.bill_number).startsWith(searchTerm));
+                renderBills(filteredBills);
             });
-        }
 
-        searchInput.addEventListener('input', () => {
-            const q = searchInput.value.trim().toLowerCase();
-            const filtered = allBills.filter(b =>
-                String(b.bill_number).startsWith(q) ||
-                b.customer_name.toLowerCase().includes(q) ||
-                b.bill_date.includes(q)
-            );
-            render(filtered);
+            function renderBills(bills) {
+                billsTableBody.innerHTML = '';
+                if (bills.length === 0) {
+                    noResultsMessage.style.display = 'block';
+                    return;
+                }
+                noResultsMessage.style.display = 'none';
+
+                bills.forEach(bill => {
+                    const row = billsTableBody.insertRow();
+                    row.innerHTML = `
+                        <td>${bill.bill_number}</td>
+                        <td>${bill.customer_name}</td>
+                        <td>${bill.bill_date}</td>
+                        <td>₹${bill.grand_total.toFixed(2)}</td>
+                        <td>
+                            <a href="/view_bill/${bill.bill_number}" class="button primary" target="_blank">View</a>
+                            <button class="button danger" onclick="cancelBill(${bill.bill_number})">Cancel</button>
+                        </td>
+                    `;
+                });
+            }
         });
 
-        await loadBills();
-    });
-
-    function cancelBill(billNumber) {
-        if (!confirm(`Cancel bill ${billNumber}? This will revert stock and permanently renumber bills.`)) return;
-        fetch(`/cancel_bill/${billNumber}`, { method: 'POST', headers: {'Content-Type':'application/json'} })
-            .then(async r => {
-                const data = await r.json();
-                if (r.ok && data.success) {
-                    alert(data.success);
-                    window.location.reload();
-                } else {
-                    alert('Error: ' + (data.error || 'Unknown'));
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Error cancelling bill');
-            });
-    }
+        // New JavaScript function to handle bill cancellation
+        function cancelBill(billNumber) {
+            if (confirm(`Are you sure you want to cancel bill number ${billNumber}? This action is irreversible and will restore products to inventory.`)) {
+                fetch(`/cancel_bill/${billNumber}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.success);
+                        // Refresh the page to show the updated bill list
+                        window.location.reload();
+                    } else {
+                        alert(`Error: ${data.error}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while trying to cancel the bill.');
+                });
+            }
+        }
     </script>
 </body>
 </html>
