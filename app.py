@@ -261,37 +261,57 @@ def get_bills():
 
 # New route to handle bill cancellation
 @app.route('/cancel_bill/<int:bill_number>', methods=['POST'])
+@login_required
 @admin_only
 def cancel_bill(bill_number):
+    """
+    Cancels a bill, reverts the stock quantities, and deletes the bill and its items.
+    """
     try:
-        bill = Bill.query.filter_by(bill_no=bill_number).first()
+        # Start a database transaction
+        bill = Bill.query.filter_by(bill_number=bill_number).first()
         if not bill:
-            return jsonify({'success': False, 'message': 'Bill not found.'})
+            logging.warning(f"Attempted to cancel non-existent bill number: {bill_number}")
+            return jsonify({'error': 'Bill not found.'}), 404
 
-        # Rollback stock quantities
-        for item in bill.items:
-            product = Product.query.get(item.product_id)
+        bill_items = BillItem.query.filter_by(bill_id=bill.id).all()
+        if not bill_items:
+            logging.warning(f"Bill {bill_number} found but has no items to revert.")
+            db.session.delete(bill)
+            db.session.commit()
+            return jsonify({'success': f'Bill {bill_number} cancelled (no items to revert).'}), 200
+        
+        # Revert stock quantities
+        for item in bill_items:
+            product = Product.query.filter_by(name=item.product_name).first()
             if product:
-                product.stock += item.quantity
-                db.session.add(product)
+                product.stock_qty += item.qty
+                db.session.add(product) # Mark product for update
+                logging.info(f"Reverted stock for product '{product.name}': +{item.qty}")
+            else:
+                logging.error(f"Product '{item.product_name}' not found during cancellation of bill {bill_number}.")
+                # Rollback if a product is missing to maintain data integrity
+                raise ValueError(f"Product '{item.product_name}' not found in inventory.")
 
-        # Get the current last_bill_number from settings
-        last_bill_setting = Setting.query.filter_by(key='last_bill_number').first()
-        if last_bill_setting and int(last_bill_setting.value) == bill_number:
-            last_bill_setting.value = str(bill_number - 1)
-            db.session.add(last_bill_setting)
-
-        # Delete the bill and its items
-        BillItem.query.filter_by(bill_id=bill.id).delete()
+        # Delete the bill items and the bill header
+        for item in bill_items:
+            db.session.delete(item)
+            
         db.session.delete(bill)
-
+        
+        # Commit the transaction
         db.session.commit()
-        return jsonify({'success': True, 'message': f'Bill no. {bill_number} has been cancelled successfully.'})
+        logging.info(f"Bill {bill_number} and associated items successfully cancelled. Stock quantities reverted.")
+        return jsonify({'success': 'Bill cancelled successfully. Stock has been reverted.'}), 200
 
+    except ValueError as ve:
+        db.session.rollback()
+        logging.error(f"Error during bill cancellation for {bill_number}: {ve}")
+        return jsonify({'error': str(ve)}), 500
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f'Error cancelling bill {bill_number}: {e}')
-        return jsonify({'success': False, 'message': f'Error cancelling bill. {str(e)}'})
+        logging.error(f"Unexpected error cancelling bill {bill_number}: {e}", exc_info=True)
+        return jsonify({'error': 'An unexpected error occurred.'}), 500
 
 
 # Route for inventory selection page
