@@ -12,7 +12,7 @@
             <a href="{{ url_for('dashboard') }}" class="sidebar-item {% if request.path == url_for('dashboard') %}active{% endif %}">Dashboard</a>
             <a href="{{ url_for('inventory_selection') }}" class="sidebar-item {% if 'inventory' in request.path %}active{% endif %}">Inventory</a>
             <a href="{{ url_for('billing_selection') }}" class="sidebar-item {% if 'billing' in request.path %}active{% endif %}">Billing</a>
-            <a href="{{ url_for('bills') }}" class="sidebar-item {% if 'bills' in request.path %}active{% endif %}">Bills</a>
+            <a href="{{ url_for('bills_selection') }}" class="sidebar-item {% if 'bills' in request.path %}active{% endif %}">Bills</a>
             <a href="{{ url_for('reports_selection') }}" class="sidebar-item {% if 'reports' in request.path %}active{% endif %}">Reports</a>
             <a href="{{ url_for('uploaded_invoices') }}" class="sidebar-item {% if 'invoices' in request.path %}active{% endif %}">Invoices</a>
             <a href="{{ url_for('user_management') }}" class="sidebar-item {% if 'user_management' in request.path %}active{% endif %}">User Management</a>
@@ -46,7 +46,7 @@
                     <div class="card-icon">🧾</div>
                     <div class="card-text">Billing</div>
                 </a>
-                <a href="{{ url_for('bills') }}" class="dashboard-card">
+                <a href="{{ url_for('bills_selection') }}" class="dashboard-card">
                     <div class="card-icon">📂</div>
                     <div class="card-text">Bills</div>
                 </a>
@@ -67,7 +67,7 @@
                     <div class="card-icon">🧾</div>
                     <div class="card-text">Billing</div>
                 </a>
-                <a href="{{ url_for('bills') }}" class="dashboard-card">
+                <a href="{{ url_for('bills_selection') }}" class="dashboard-card">
                     <div class="card-icon">📂</div>
                     <div class="card-text">Bills</div>
                 </a>
