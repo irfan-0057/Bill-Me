@@ -11,12 +11,16 @@
         <a href="{{ url_for('dashboard') }}" class="sidebar-item">Dashboard</a>
         <a href="{{ url_for('inventory_selection') }}" class="sidebar-item">Inventory</a>
         <a href="{{ url_for('billing_selection') }}" class="sidebar-item">Billing</a>
-        <a href="{{ url_for('bills') }}" class="sidebar-item active">Bills</a>
+        <a href="{{ url_for('bills_selection') }}" class="sidebar-item active">Bills</a>
         <a href="{{ url_for('reports_selection') }}" class="sidebar-item">Reports</a>
+        {% if g.role == 'admin' %}
+        <a href="{{ url_for('user_management') }}" class="sidebar-item">User Management</a>
+        <a href="{{ url_for('uploaded_invoices') }}" class="sidebar-item">Invoices</a>
+        {% endif %}
     </div>
 
     <div class="content">
-        <h1>Bills History</h1>
+        <h1 id="page-title">Bills History</h1>
         <div class="form-section">
             <div class="input-group">
                 <label for="billSearch">Search by Bill Number:</label>
@@ -47,10 +51,23 @@
             const billSearchInput = document.getElementById('billSearch');
             const billsTableBody = document.getElementById('bills-table-body');
             const noResultsMessage = document.getElementById('no-results-message');
+            const pageTitle = document.getElementById('page-title');
+            
             let allBills = [];
 
+            // Get product type from URL
+            const urlParts = window.location.pathname.split('/');
+            const productType = urlParts[urlParts.length - 1];
+
+            // Update page title based on product type
+            if (productType === 'all') {
+                pageTitle.textContent = "All Bills History";
+            } else {
+                pageTitle.textContent = productType.charAt(0).toUpperCase() + productType.slice(1) + " Bills History";
+            }
+
             try {
-                const response = await fetch('/get_bills');
+                const response = await fetch(`/get_bills/${productType}`);
                 allBills = await response.json();
                 renderBills(allBills);
             } catch (error) {
@@ -88,7 +105,6 @@
             }
         });
 
-        // New JavaScript function to handle bill cancellation
         function cancelBill(billNumber) {
             if (confirm(`Are you sure you want to cancel bill number ${billNumber}? This action is irreversible and will restore products to inventory.`)) {
                 fetch(`/cancel_bill/${billNumber}`, {
@@ -101,7 +117,6 @@
                 .then(data => {
                     if (data.success) {
                         alert(data.success);
-                        // Refresh the page to show the updated bill list
                         window.location.reload();
                     } else {
                         alert(`Error: ${data.error}`);
