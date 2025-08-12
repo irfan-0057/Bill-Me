@@ -3,28 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bismilla Traders - {{ product_type.capitalize() }} Bills</title>
+    <title>Bismilla Traders - Bill Search</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="sidebar">
-        {% if g.role == 'admin' %}
-            <a href="{{ url_for('dashboard') }}" class="sidebar-item">Dashboard</a>
-            <a href="{{ url_for('inventory_selection') }}" class="sidebar-item">Inventory</a>
-            <a href="{{ url_for('billing_selection') }}" class="sidebar-item">Billing</a>
-            <a href="{{ url_for('bills_selection') }}" class="sidebar-item active">Bills</a>
-            <a href="{{ url_for('reports_selection') }}" class="sidebar-item">Reports</a>
-            <a href="{{ url_for('uploaded_invoices') }}" class="sidebar-item">Invoices</a>
-            <a href="{{ url_for('user_management') }}" class="sidebar-item">User Management</a>
-        {% else %}
-            <a href="{{ url_for('billing_selection') }}" class="sidebar-item">Billing</a>
-            <a href="{{ url_for('bills_selection') }}" class="sidebar-item active">Bills</a>
-        {% endif %}
-        <a href="{{ url_for('logout') }}" class="sidebar-item">Log Out</a>
+        <a href="{{ url_for('dashboard') }}" class="sidebar-item">Dashboard</a>
+        <a href="{{ url_for('inventory_selection') }}" class="sidebar-item">Inventory</a>
+        <a href="{{ url_for('billing_selection') }}" class="sidebar-item">Billing</a>
+        <a href="{{ url_for('bills') }}" class="sidebar-item active">Bills</a>
+        <a href="{{ url_for('reports_selection') }}" class="sidebar-item">Reports</a>
     </div>
 
     <div class="content">
-        <h1>{{ product_type.capitalize() }} Bills History</h1>
+        <h1>Bills History</h1>
         <div class="form-section">
             <div class="input-group">
                 <label for="billSearch">Search by Bill Number:</label>
@@ -32,7 +24,7 @@
             </div>
         </div>
         <div class="table-container">
-            <h2>{{ product_type.capitalize() }} Bills</h2>
+            <h2>All Bills</h2>
             <table id="bills-table">
                 <thead>
                     <tr>
@@ -57,12 +49,8 @@
             const noResultsMessage = document.getElementById('no-results-message');
             let allBills = [];
 
-            // Get the product_type from the URL
-            const productType = "{{ product_type }}";
-
             try {
-                // Use the product_type in the fetch URL
-                const response = await fetch(`/get_bills/${productType}`);
+                const response = await fetch('/get_bills');
                 allBills = await response.json();
                 renderBills(allBills);
             } catch (error) {
