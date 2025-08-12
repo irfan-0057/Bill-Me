@@ -263,10 +263,9 @@ def get_bills(product_type):
         bills_list.append({
             'bill_number': bill.bill_number,
             'customer_name': bill.customer_name,
-            'bill_date': bill.bill_date.strftime('%Y-%m-%d'), # Format date for JSON
+            'bill_date': bill.bill_date.strftime('%Y-%m-%d'),
             'grand_total': bill.grand_total
         })
-    logging.info(f"Fetched {len(bills_list)} bills for display.")
     return jsonify(bills_list)
 
 
