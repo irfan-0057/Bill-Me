@@ -234,19 +234,30 @@ def logout():
 def dashboard():
     return render_template('dashboard.html')
 
-# Route for bills selection page
-@app.route('/bills')
+# New route for bills selection page
+@app.route('/bills_selection')
 @login_required
-def bills():
-    return render_template('bills.html')
+def bills_selection():
+    return render_template('bills_selection.html')
 
-# API endpoint to get all bills for searching
-@app.route('/get_bills')
+# Route for bills history, now with a product_type filter
+@app.route('/bills/<product_type>')
 @login_required
-def get_bills():
-    # New: Use SQLAlchemy to fetch all bills
-    bills_data = Bill.query.order_by(Bill.bill_number.desc()).all()
+def bills(product_type):
+    return render_template('bills.html', product_type=product_type)
 
+# API endpoint to get all bills for searching, now with filtering
+@app.route('/get_bills/<product_type>')
+@login_required
+def get_bills(product_type):
+    if product_type == 'all':
+        bills_data = Bill.query.order_by(Bill.bill_number.desc()).all()
+    else:
+        # Join Bill, BillItem, and Product tables to filter by product_type
+        bills_data = Bill.query.join(BillItem).join(Product).filter(
+            Product.product_type == product_type
+        ).order_by(Bill.bill_number.desc()).distinct().all()
+    
     bills_list = []
     for bill in bills_data:
         bills_list.append({
