@@ -234,38 +234,28 @@ def logout():
 def dashboard():
     return render_template('dashboard.html')
 
-# New route for bills selection page
-@app.route('/bills_selection')
+# Route for bills selection page
+@app.route('/bills')
 @login_required
-def bills_selection():
-    return render_template('bills_selection.html')
+def bills():
+    return render_template('bills.html')
 
-# Route for bills history, now with a product_type filter
-@app.route('/bills/<product_type>')
+# API endpoint to get all bills for searching
+@app.route('/get_bills')
 @login_required
-def bills(product_type):
-    return render_template('bills.html', product_type=product_type)
+def get_bills():
+    # New: Use SQLAlchemy to fetch all bills
+    bills_data = Bill.query.order_by(Bill.bill_number.desc()).all()
 
-# API endpoint to get all bills for searching, now with filtering
-@app.route('/get_bills/<product_type>')
-@login_required
-def get_bills(product_type):
-    if product_type == 'all':
-        bills_data = Bill.query.order_by(Bill.bill_number.desc()).all()
-    else:
-        # Join Bill, BillItem, and Product tables to filter by product_type
-        bills_data = Bill.query.join(BillItem).join(Product).filter(
-            Product.product_type == product_type
-        ).order_by(Bill.bill_number.desc()).distinct().all()
-    
     bills_list = []
     for bill in bills_data:
         bills_list.append({
             'bill_number': bill.bill_number,
             'customer_name': bill.customer_name,
-            'bill_date': bill.bill_date.strftime('%Y-%m-%d'),
+            'bill_date': bill.bill_date.strftime('%Y-%m-%d'), # Format date for JSON
             'grand_total': bill.grand_total
         })
+    logging.info(f"Fetched {len(bills_list)} bills for display.")
     return jsonify(bills_list)
 
 
