@@ -97,6 +97,7 @@
             
             // This line is correct in how it gets the products from Flask
             const products = JSON.parse('{{ products | tojson | safe }}');
+            const productType = '{{ product_type }}';
             
             let billItems = [];
             let itemCounter = 1;
@@ -257,6 +258,7 @@
                     totalBeforeTax: totalBeforeTax,
                     totalGst: totalGst,
                     grandTotal: grandTotal
+                    productType: productType
                 };
 
                 try {
