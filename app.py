@@ -2,7 +2,7 @@
 
 from flask import Flask, request, jsonify, render_template, send_file, redirect, url_for, session, g, send_from_directory
 import sqlite3 # Still needed for local init_db if running locally without DATABASE_URL set
-import datetime
+from datetime import datetime, timezone
 from weasyprint import HTML
 import os
 import uuid
@@ -69,7 +69,7 @@ class Bill(db.Model):
     customer_name = db.Column(db.String(100), nullable=False)
     customer_mobile = db.Column(db.String(15), nullable=True)
     customer_village = db.Column(db.String(100), nullable=True)
-    date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    date = db.Column(db.DateTime, nullable=False, default=datetime.now(timezone.utc))
     grand_total = db.Column(db.Float, nullable=False)
     product_type = db.Column(db.String(20), nullable=False) # ADD THIS LINE
     # Relationship to BillItem (one-to-many)
@@ -126,7 +126,8 @@ class Invoice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     original_filename = db.Column(db.Text, nullable=False)
     stored_filename = db.Column(db.Text, nullable=False)
-    upload_date = db.Column(db.Text, nullable=False) # Stored as 'YYYY-MM-DD' string
+    # New: Use db.DateTime with a default value
+    upload_date = db.Column(db.DateTime, nullable=False, default=datetime.now(timezone.utc))
 
     def __repr__(self):
         return f"<Invoice {self.original_filename}>"
