@@ -64,16 +64,15 @@ class Product(db.Model):
         return f"<Product {self.name}>"
 
 class Bill(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    bill_number = db.Column(db.String(20), unique=True, nullable=False)
+    __tablename__ = 'bills'
+    # Change: bill_number is the primary key and is now a string
+    bill_number = db.Column(db.String(20), primary_key=True)
     customer_name = db.Column(db.String(100), nullable=False)
-    customer_mobile = db.Column(db.String(15), nullable=True)
-    customer_village = db.Column(db.String(100), nullable=True)
-    date = db.Column(db.DateTime, nullable=False, default=datetime.now(timezone.utc))
+    bill_date = db.Column(db.Date, nullable=False, default=datetime.now(timezone.utc).date())
     grand_total = db.Column(db.Float, nullable=False)
-    product_type = db.Column(db.String(20), nullable=False) # ADD THIS LINE
-    # Relationship to BillItem (one-to-many)
-    items = db.relationship('BillItem', backref='bill', lazy=True)
+    product_type = db.Column(db.String(50), nullable=False)
+    # New: This establishes the relationship with BillItem
+    items = db.relationship('BillItem', backref='bill', lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Bill {self.bill_number}>"
@@ -81,15 +80,15 @@ class Bill(db.Model):
 class BillItem(db.Model):
     __tablename__ = 'bill_items'
     id = db.Column(db.Integer, primary_key=True)
-    bill_id = db.Column(db.Integer, db.ForeignKey('bills.id'), nullable=False)
-    product_name = db.Column(db.Text, nullable=False)
-    qty = db.Column(db.Integer, nullable=False)
+    product_name = db.Column(db.String(100), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
     rate = db.Column(db.Float, nullable=False)
     amount = db.Column(db.Float, nullable=False)
-    gst_percentage = db.Column(db.Float, nullable=False)
+    # New: This is the foreign key linking to the Bill model
+    bill_number = db.Column(db.String(20), db.ForeignKey('bills.bill_number'), nullable=False)
 
     def __repr__(self):
-        return f"<BillItem {self.product_name} on Bill {self.bill_id}>"
+        return f"<BillItem for Bill {self.bill_number}>"
 
 class Setting(db.Model):
     __tablename__ = 'settings'
