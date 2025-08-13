@@ -64,15 +64,14 @@ class Product(db.Model):
         return f"<Product {self.name}>"
 
 class Bill(db.Model):
-    __tablename__ = 'bills'
     id = db.Column(db.Integer, primary_key=True)
-    bill_number = db.Column(db.Integer, nullable=False, unique=True) # Bill number should be unique
-    customer_name = db.Column(db.Text, nullable=False)
-    customer_village = db.Column(db.Text) # New: Added to persist this info
-    customer_mobile_num = db.Column(db.Text) # New: Added to persist this info
-    bill_date = db.Column(db.Date, nullable=False)
+    bill_number = db.Column(db.String(20), unique=True, nullable=False)
+    customer_name = db.Column(db.String(100), nullable=False)
+    customer_mobile = db.Column(db.String(15), nullable=True)
+    customer_village = db.Column(db.String(100), nullable=True)
+    date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     grand_total = db.Column(db.Float, nullable=False)
-
+    product_type = db.Column(db.String(20), nullable=False) # ADD THIS LINE
     # Relationship to BillItem (one-to-many)
     items = db.relationship('BillItem', backref='bill', lazy=True)
 
@@ -147,17 +146,23 @@ def init_db():
             admin_user.password = 'admin123' # This will hash the password via the setter
             db.session.add(admin_user)
             logging.info("Default admin user added.")
-        
+            
         if not User.query.filter_by(username='user').first():
             regular_user = User(username='user', role='user')
             regular_user.password = 'user123' # This will hash the password via the setter
             db.session.add(regular_user)
             logging.info("Default regular user added.")
 
-        # Initialize last_bill_number if it doesn't exist
-        if not Setting.query.filter_by(key='last_bill_number').first():
-            db.session.add(Setting(key='last_bill_number', value=0))
-            logging.info("Last bill number setting initialized to 0.")
+        # --- UPDATED: Initialize separate bill number settings for each product type ---
+        # Remove the old 'last_bill_number' setting.
+        if not Setting.query.filter_by(key='last_fertilizer_bill_number').first():
+            db.session.add(Setting(key='last_fertilizer_bill_number', value=100))
+            logging.info("Last fertilizer bill number setting initialized to 100.")
+        
+        if not Setting.query.filter_by(key='last_pesticide_bill_number').first():
+            db.session.add(Setting(key='last_pesticide_bill_number', value=100))
+            logging.info("Last pesticide bill number setting initialized to 100.")
+        # --- END UPDATE ---
 
         db.session.commit()
         logging.info("Database initialization complete (models created and data seeded).")
@@ -187,6 +192,31 @@ def admin_only(f):
             return "Access Denied. You must be an admin to view this page.", 403
         return f(*args, **kwargs)
     return decorated_function
+
+# Add the new functions here
+def get_next_bill_number(product_type):
+    key = f'last_{product_type}_bill_number'
+    setting = Setting.query.filter_by(key=key).first()
+    if not setting:
+        setting = Setting(key=key, value='100')
+        db.session.add(setting)
+        db.session.commit()
+    
+    current_number = int(setting.value) + 1
+    setting.value = str(current_number)
+    db.session.commit()
+    
+    prefix = 'F' if product_type == 'fertilizer' else 'P'
+    return f'{prefix}-{current_number}'
+
+def decrement_bill_number(bill_number, product_type):
+    key = f'last_{product_type}_bill_number'
+    setting = Setting.query.filter_by(key=key).first()
+    if setting:
+        current_number = int(setting.value)
+        if current_number == int(bill_number.split('-')[1]):
+            setting.value = str(current_number - 1)
+            db.session.commit()
 
 # Before each request, make the user's role available to all templates via Flask's 'g' object
 @app.before_request
@@ -238,50 +268,54 @@ def dashboard():
 @app.route('/bills')
 @login_required
 def bills():
-    return render_template('bills.html')
+    return render_template('bills_selection.html')
+@app.route('/view_bills/<string:product_type>')
+@login_required
+def view_bills(product_type):
+    return render_template('bills.html', product_type=product_type) # ADD THIS NEW ROUTE
 
 # API endpoint to get all bills for searching
-@app.route('/get_bills')
+@app.route('/get_bills/<string:product_type>')
 @login_required
-def get_bills():
-    # New: Use SQLAlchemy to fetch all bills
-    bills_data = Bill.query.order_by(Bill.bill_number.desc()).all()
+def get_bills(product_type):
+    try:
+        # Update: Filter bills by the product_type received from the URL
+        bills_data = Bill.query.filter_by(product_type=product_type).order_by(Bill.bill_number.desc()).all()
 
-    bills_list = []
-    for bill in bills_data:
-        bills_list.append({
-            'bill_number': bill.bill_number,
-            'customer_name': bill.customer_name,
-            'bill_date': bill.bill_date.strftime('%Y-%m-%d'), # Format date for JSON
-            'grand_total': bill.grand_total
-        })
-    logging.info(f"Fetched {len(bills_list)} bills for display.")
-    return jsonify(bills_list)
-
+        bills_list = []
+        for bill in bills_data:
+            bills_list.append({
+                'bill_number': bill.bill_number,
+                'customer_name': bill.customer_name,
+                'bill_date': bill.bill_date.strftime('%Y-%m-%d'), # Format date for JSON
+                'grand_total': bill.grand_total,
+                'product_type': bill.product_type # New: Include the product type in the response
+            })
+        logging.info(f"Fetched {len(bills_list)} bills for display for product type '{product_type}'.")
+        return jsonify(bills_list)
+    except Exception as e:
+        logging.error(f"Error fetching bills for product type '{product_type}': {e}")
+        return jsonify({'error': 'An error occurred while fetching bills.'}), 500
 
 # New route to handle bill cancellation
-@app.route('/cancel_bill/<int:bill_number>', methods=['POST'])
+@app.route('/cancel_bill/<string:bill_number>', methods=['POST'])
 @login_required
 @admin_only
 def cancel_bill(bill_number):
     """
     Cancels a bill, reverts stock quantities, and, if it was the last bill created,
-    reverts the last_bill_number to reclaim the bill number.
+    reverts the last_bill_number to reclaim the bill number for its specific type.
     """
     try:
+        # Query using the string bill_number
         bill = Bill.query.filter_by(bill_number=bill_number).first()
         if not bill:
             logging.warning(f"Attempted to cancel non-existent bill number: {bill_number}")
             return jsonify({'error': 'Bill not found.'}), 404
-        
-        # New logic to handle bill number reversion
-        # Check if the cancelled bill is the last one in the sequence
-        last_bill_number_setting = Setting.query.filter_by(key='last_bill_number').first()
-        if last_bill_number_setting and bill.bill_number == last_bill_number_setting.value:
-            logging.info(f"Reverting last bill number from {last_bill_number_setting.value} to {last_bill_number_setting.value - 1} due to cancellation of bill {bill_number}.")
-            last_bill_number_setting.value -= 1
-            db.session.add(last_bill_number_setting)
-        
+
+        # Get the product type from the bill before it's deleted
+        product_type = bill.product_type
+
         # Revert stock quantities for each item in the cancelled bill
         bill_items = BillItem.query.filter_by(bill_id=bill.id).all()
         if not bill_items:
@@ -289,24 +323,31 @@ def cancel_bill(bill_number):
             db.session.delete(bill)
             db.session.commit()
             return jsonify({'success': f'Bill {bill_number} cancelled (no items to revert).'}), 200
+
         for item in bill_items:
-            product = Product.query.filter_by(name=item.product_name).first()
+            # Query the Product model using the correct 'product_name' column
+            product = Product.query.filter_by(product_name=item.product_name).first()
             if product:
-                product.stock_qty += item.qty
+                product.stock += item.qty
                 db.session.add(product)
-                logging.info(f"Reverted stock for product '{product.name}': +{item.qty}")
+                logging.info(f"Reverted stock for product '{product.product_name}': +{item.qty}")
             else:
                 logging.error(f"Product '{item.product_name}' not found during cancellation of bill {bill_number}.")
                 raise ValueError(f"Product '{item.product_name}' not found in inventory.")
-        
+
         # Delete the bill items and the bill itself
         for item in bill_items:
             db.session.delete(item)
         db.session.delete(bill)
+
+        # Use the new helper function to decrement the bill number if applicable
+        decrement_bill_number(bill_number, product_type)
+        
         db.session.commit()
         
         logging.info(f"Bill {bill_number} and associated items successfully cancelled. Stock quantities reverted.")
         return jsonify({'success': 'Bill cancelled successfully. Stock has been reverted.'}), 200
+
     except ValueError as ve:
         db.session.rollback()
         logging.error(f"Error during bill cancellation for {bill_number}: {ve}")
@@ -486,24 +527,26 @@ def billing_selection():
 @app.route('/billing/<product_type>')
 @login_required
 def billing(product_type):
-    products = []
+    products_list = []
     try:
-        # New: Fetch products using SQLAlchemy
-        products_data = Product.query.filter_by(product_type=product_type).order_by(Product.name.asc()).all()
+        # New: Fetch products using SQLAlchemy, filtering by the new product_type column
+        # and ordering by the correct column name, product_name.
+        products_data = Product.query.filter_by(product_type=product_type).order_by(Product.product_name.asc()).all()
         
-        products_list = []
         for product in products_data:
             products_list.append({
                 'id': product.id,
-                'name': product.name,
-                'company_name': product.company_name
+                'product_name': product.product_name, # Corrected variable name
+                'rate': product.rate, # Added for completeness, if you need it later
+                'gst': product.gst,   # Added for completeness
+                'stock': product.stock # Added for completeness
             })
         logging.info(f"Fetched {len(products_list)} products for billing of type '{product_type}'.")
     except Exception as e:
         logging.error(f"Error fetching products for billing '{product_type}': {e}")
     
+    # Pass the products_list to the template
     return render_template('billing.html', products=products_list, today_date=datetime.date.today(), product_type=product_type)
-
 # New API endpoint to get a single product's details by ID
 @app.route('/product/<int:product_id>')
 @login_required
@@ -536,44 +579,39 @@ def get_product_details(product_id):
         return jsonify({'error': str(e)}), 500
 
 # New API endpoint to generate the PDF bill with a simple, sequential number
+# New API endpoint to generate the PDF bill with a simple, sequential number
 @app.route('/generate_pdf', methods=['POST'])
 @login_required
 def generate_pdf():
     data = request.json
     
     try:
-        # Start a transaction (implicit with SQLAlchemy session)
-        
-        # Get and increment the last bill number
-        last_bill_number_setting = Setting.query.filter_by(key='last_bill_number').first()
-        if not last_bill_number_setting:
-            # This should ideally not happen if init_db runs correctly
-            last_bill_number_setting = Setting(key='last_bill_number', value=0)
-            db.session.add(last_bill_number_setting)
-            db.session.commit() # Commit the creation of setting first
-            
-        new_bill_number = last_bill_number_setting.value + 1
-        last_bill_number_setting.value = new_bill_number
-        db.session.add(last_bill_number_setting) # Mark as modified
-        logging.info(f"Generated new bill number: {new_bill_number}")
+        # Get the product type from the frontend data
+        product_type = data.get('productType')
+        if not product_type:
+            return jsonify({'error': 'Product type is missing from the request.'}), 400
+
+        # --- UPDATED: Use the new function to get the next bill number for the specific product type ---
+        new_bill_number = get_next_bill_number(product_type)
+        logging.info(f"Generated new bill number: {new_bill_number} for product type: {product_type}")
+        # --- END UPDATE ---
 
         # Save the bill to the database using the Bill model
-        # New: Capturing village and mobileNum from frontend
         new_bill = Bill(
             bill_number=new_bill_number,
             customer_name=data['customerName'],
-            customer_village=data.get('village', 'N/A'), # Get from data, default to N/A
-            customer_mobile_num=data.get('mobileNum', 'N/A'), # Get from data, default to N/A
-            bill_date=datetime.datetime.strptime(data['billDate'], '%Y-%m-%d').date(), # Convert to date object
-            grand_total=data['grandTotal']
+            customer_village=data.get('village', 'N/A'),
+            customer_mobile_num=data.get('mobileNum', 'N/A'),
+            bill_date=datetime.datetime.strptime(data['billDate'], '%Y-%m-%d').date(),
+            grand_total=data['grandTotal'],
+            product_type=product_type  # ADDED: Store the product type with the bill
         )
         db.session.add(new_bill)
-        db.session.flush() # Flush to get bill_id before committing (needed for bill_items)
+        db.session.flush()
         logging.info(f"Bill header saved with ID {new_bill.id}.")
 
-        # Save bill items and update stock
+        # Save bill items and update stock (This part remains largely the same)
         for item_data in data['products']:
-            # Basic validation for quantities and rates during billing
             try:
                 qty = int(item_data['qty'])
                 rate = float(item_data['rate'])
@@ -582,11 +620,10 @@ def generate_pdf():
                 if qty <= 0 or rate < 0 or amount < 0 or gst < 0:
                     raise ValueError("Quantity must be positive. Rate, Amount, and GST must be non-negative.")
             except ValueError as ve:
-                db.session.rollback() # Rollback transaction if any item data is invalid
+                db.session.rollback()
                 logging.error(f"Invalid product data during bill generation: {ve}")
                 return jsonify({'error': f"Invalid product data: {ve}"}), 400
 
-            # Update product stock
             product_to_update = Product.query.filter_by(name=item_data['name']).first()
             if product_to_update:
                 if product_to_update.stock_qty < qty:
@@ -594,13 +631,12 @@ def generate_pdf():
                     logging.warning(f"Insufficient stock for {item_data['name']}. Available: {product_to_update.stock_qty}, Requested: {qty}")
                     return jsonify({'error': f"Insufficient stock for {item_data['name']}. Available: {product_to_update.stock_qty}, Requested: {qty}"}), 400
                 product_to_update.stock_qty -= qty
-                db.session.add(product_to_update) # Mark as modified
+                db.session.add(product_to_update)
             else:
                 db.session.rollback()
                 logging.error(f"Product '{item_data['name']}' not found when updating stock.")
                 return jsonify({'error': f"Product '{item_data['name']}' not found."}), 404
 
-            # Create new BillItem instance
             new_bill_item = BillItem(
                 bill_id=new_bill.id,
                 product_name=item_data['name'],
@@ -610,23 +646,9 @@ def generate_pdf():
                 gst_percentage=gst
             )
             db.session.add(new_bill_item)
-        
-        db.session.commit() # Commit the entire transaction
-
-        # --- LOGIC TO DETERMINE BILL TYPE ---
-        product_names = [item_data['name'] for item_data in data['products']]
-        bill_type = 'general' # Default to general bill
-        if product_names:
-            # Query for product types of items in the current bill
-            product_types_in_bill = db.session.query(Product.product_type).filter(Product.name.in_(product_names)).distinct().all()
-            product_types_in_bill_list = [pt[0] for pt in product_types_in_bill]
-
-            if 'pesticide' in product_types_in_bill_list:
-                bill_type = 'pesticide'
-            elif 'fertilizer' in product_types_in_bill_list:
-                bill_type = 'fertilizer'
-        logging.info(f"Determined bill type for Bill {new_bill_number}: {bill_type}")
-        # --- END BILL TYPE LOGIC ---
+            
+        db.session.commit()
+      
 
         # Prepare data for the PDF template
         pdf_template_data = {
