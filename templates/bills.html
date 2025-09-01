@@ -19,8 +19,8 @@
         <h1>Bills History</h1>
         <div class="form-section">
             <div class="input-group">
-                <label for="billSearch">Search by Bill Number:</label>
-                <input type="number" id="billSearch" placeholder="Enter Bill Number">
+                <label for="billSearch">Search by Bill Number or Customer:</label>
+                <input type="text" id="billSearch" placeholder="Enter Bill Number or Name">
             </div>
         </div>
         <div class="table-container">
@@ -38,7 +38,7 @@
                 <tbody id="bills-table-body">
                     </tbody>
             </table>
-            <p id="no-results-message" style="display: none;">No bills found with that number.</p>
+            <p id="no-results-message" style="display: none;">No bills found.</p>
         </div>
     </div>
 
@@ -59,8 +59,11 @@
             }
 
             billSearchInput.addEventListener('input', function() {
-                const searchTerm = billSearchInput.value.trim();
-                const filteredBills = allBills.filter(bill => String(bill.bill_number).startsWith(searchTerm));
+                const searchTerm = billSearchInput.value.trim().toLowerCase();
+                const filteredBills = allBills.filter(bill =>
+                    String(bill.bill_number).toLowerCase().includes(searchTerm) ||
+                    bill.customer_name.toLowerCase().includes(searchTerm)
+                );
                 renderBills(filteredBills);
             });
 
@@ -73,25 +76,30 @@
                 noResultsMessage.style.display = 'none';
 
                 bills.forEach(bill => {
+                    // UPDATE 2: Added encodeURIComponent for safety in the URL
+                    const encodedBillNumber = encodeURIComponent(bill.bill_number);
                     const row = billsTableBody.insertRow();
+                    
+                    // UPDATE 3: Added single quotes around bill.bill_number in the onclick call
                     row.innerHTML = `
                         <td>${bill.bill_number}</td>
                         <td>${bill.customer_name}</td>
                         <td>${bill.bill_date}</td>
                         <td>₹${bill.grand_total.toFixed(2)}</td>
                         <td>
-                            <a href="/view_bill/${bill.bill_number}" class="button primary" target="_blank">View</a>
-                            <button class="button danger" onclick="cancelBill(${bill.bill_number})">Cancel</button>
+                            <a href="/view_bill/${encodedBillNumber}" class="button primary" target="_blank">View</a>
+                            <button class="button danger" onclick="cancelBill('${bill.bill_number}')">Cancel</button>
                         </td>
                     `;
                 });
             }
         });
 
-        // New JavaScript function to handle bill cancellation
+        // This JavaScript function is correct and does not need changes,
+        // but it relies on the onclick attribute being fixed above.
         function cancelBill(billNumber) {
             if (confirm(`Are you sure you want to cancel bill number ${billNumber}? This action is irreversible and will restore products to inventory.`)) {
-                fetch(`/cancel_bill/${billNumber}`, {
+                fetch(`/cancel_bill/${encodeURIComponent(billNumber)}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -101,7 +109,6 @@
                 .then(data => {
                     if (data.success) {
                         alert(data.success);
-                        // Refresh the page to show the updated bill list
                         window.location.reload();
                     } else {
                         alert(`Error: ${data.error}`);
