@@ -1,6 +1,6 @@
 # File: migration.py
 # This script is to be run ONLY ONCE on your deployed Render application.
-
+from sqlalchemy import text
 from app import app, db, Bill, Setting
 import logging
 
@@ -37,7 +37,9 @@ def run_migration():
             # This requires raw SQL as SQLAlchemy doesn't have a simple alter_column for this.
             # The exact command can vary slightly between DBs, but this is standard.
             # On PostgreSQL (used by Render), this works.
-            db.engine.execute('ALTER TABLE bills ALTER COLUMN bill_number TYPE TEXT;')
+            with db.engine.connect() as connection:
+                  with connection.begin(): # Manages the transaction (commit/rollback)
+                      connection.execute(text('ALTER TABLE bills ALTER COLUMN bill_number TYPE TEXT;'))
             logging.info("Altered 'bills.bill_number' column type to TEXT.")
 
             # --- Step 3: Update all existing bills to the new string format ---
