@@ -270,8 +270,6 @@ def cancel_bill(bill_number):
         logging.error(f"Unexpected error cancelling bill {bill_number}: {e}", exc_info=True)
         return jsonify({'error': 'An unexpected error occurred.'}), 500
 
-
-            
 # Route for inventory selection page
 @app.route('/inventory')
 @login_required
@@ -563,7 +561,7 @@ def serve_pdf(filename):
         return jsonify({'error': 'File not found'}), 404
 
 # MODIFIED: Route now takes a string bill_number
-@app.route('/view_bill/<bill_number>')
+@app.route('/view_bill/<path:bill_number>')
 @login_required
 def view_bill(bill_number):
     try:
