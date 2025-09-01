@@ -24,10 +24,19 @@ def create_and_seed_db():
             db.session.add(regular_user)
             logging.info("Default regular user added.")
 
-        # Initialize last_bill_number if it doesn't exist
-        if not Setting.query.filter_by(key='last_bill_number').first():
-            db.session.add(Setting(key='last_bill_number', value=0))
-            logging.info("Last bill number setting initialized to 0.")
+        # NEW: Initialize last bill numbers for each product type
+        if not Setting.query.filter_by(key='last_bill_number_fertilizer').first():
+            db.session.add(Setting(key='last_bill_number_fertilizer', value=0))
+            logging.info("Last bill number for fertilizer initialized to 0.")
+            
+        if not Setting.query.filter_by(key='last_bill_number_pesticide').first():
+            db.session.add(Setting(key='last_bill_number_pesticide', value=0))
+            logging.info("Last bill number for pesticide initialized to 0.")
+            
+        if not Setting.query.filter_by(key='last_bill_number_general').first():
+            db.session.add(Setting(key='last_bill_number_general', value=0))
+            logging.info("Last bill number for general initialized to 0.")
+
 
         db.session.commit()
         logging.info("Database initialization and seeding complete from db_init.py.")
