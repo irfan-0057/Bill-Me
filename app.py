@@ -270,48 +270,7 @@ def cancel_bill(bill_number):
         logging.error(f"Unexpected error cancelling bill {bill_number}: {e}", exc_info=True)
         return jsonify({'error': 'An unexpected error occurred.'}), 500
 
-# New route to view a historical bill
-@app.route('/view_bill/<path:bill_number>')
-@login_required
-def view_bill(bill_number):
-    try:
-        # Fetch bill header details using SQLAlchemy
-        bill_header = Bill.query.filter_by(bill_number=bill_number).first()
-        
-        if not bill_header:
-            logging.warning(f"Bill number {bill_number} not found for viewing.")
-            return "Bill not found.", 404
-            
-        # Access attributes directly from the model instance
-        customer_name = bill_header.customer_name
-        bill_date = bill_header.bill_date.strftime('%Y-%m-%d') # Format for template
-        grand_total = bill_header.grand_total
-        village = bill_header.customer_village
-        mobileNum = bill_header.customer_mobile_num
 
-        # Fetch all bill items associated with this bill, and join with product details
-        bill_items_data = db.session.query(
-            BillItem, Product.company_name, Product.mfg_date, Product.exp_date,
-            Product.batch_num, Product.pack_size, Product.product_type
-        ).join(Product, BillItem.product_name == Product.name).filter(
-            BillItem.bill_id == bill_header.id
-        ).all()
-        
-        bill_items = []
-        product_types_for_bill_type_determination = []
-        for item_obj, company_name, mfg_date, exp_date, batch_num, pack_size, product_type in bill_items_data:
-            bill_items.append({
-                'name': item_obj.product_name,
-                'qty': item_obj.qty,
-                'rate': item_obj.rate,
-                'amount': item_obj.amount,
-                'gst': item_obj.gst_percentage,
-                'company_name': company_name,
-                'mfg_date': mfg_date,
-                'exp_date': exp_date,
-                'batch_num': batch_num,
-                'pack_size': pack_size
-            })
             
 # Route for inventory selection page
 @app.route('/inventory')
