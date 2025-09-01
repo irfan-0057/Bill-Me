@@ -1,1 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bismilla Traders - Select Bill Type</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="sidebar">
+        <a href="{{ url_for('dashboard') }}" class="sidebar-item">Dashboard</a>
+        <a href="{{ url_for('inventory_selection') }}" class="sidebar-item">Inventory</a>
+        <a href="{{ url_for('billing_selection') }}" class="sidebar-item">Billing</a>
+        <a href="{{ url_for('bills_selection') }}" class="sidebar-item active">Bills</a>
+        <a href="{{ url_for('reports_selection') }}" class="sidebar-item">Reports</a>
+    </div>
 
+    <div class="content">
+        <header class="dashboard-header">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Bismilla Traders Logo">
+            </div>
+            <h1>View Bills</h1>
+            <p>Select a category to view the bill history.</p>
+        </header>
+
+        <main class="dashboard-main">
+            <div class="dashboard-grid">
+                <a href="{{ url_for('bills_list', bill_type='pesticide') }}" class="dashboard-card">
+                    <div class="card-icon">🕷️</div>
+                    <div class="card-text">Pesticide Bills</div>
+                </a>
+                <a href="{{ url_for('bills_list', bill_type='fertilizer') }}" class="dashboard-card">
+                    <div class="card-icon">🌱</div>
+                    <div class="card-text">Fertilizer Bills</div>
+                </a>
+                <a href="{{ url_for('bills_list', bill_type='old') }}" class="dashboard-card">
+                    <div class="card-icon">📜</div>
+                    <div class="card-text">Old / Migrated Bills</div>
+                </a>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
