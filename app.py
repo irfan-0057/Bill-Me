@@ -217,7 +217,7 @@ def bills_list(bill_type):
     }
     # Get the title, with a default fallback
     bill_type_title = titles.get(bill_type, 'All Bills')
-    return render_template('bills.html', bill_type=bill_type, bill_type_title=bill_type_title)
+    return render_template('bill_list.html', bill_type=bill_type, bill_type_title=bill_type_title)
 
 # API endpoint to get all bills for searching
 # MODIFIED: API endpoint now filters bills based on the 'type' query parameter
