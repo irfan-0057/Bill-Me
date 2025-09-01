@@ -66,10 +66,11 @@ class Product(db.Model):
 class Bill(db.Model):
     __tablename__ = 'bills'
     id = db.Column(db.Integer, primary_key=True)
-    bill_number = db.Column(db.Integer, nullable=False, unique=True) # Bill number should be unique
+    # MODIFIED: Changed bill_number to Text to store formatted string like 'BT/F/001'
+    bill_number = db.Column(db.Text, nullable=False, unique=True)
     customer_name = db.Column(db.Text, nullable=False)
-    customer_village = db.Column(db.Text) # New: Added to persist this info
-    customer_mobile_num = db.Column(db.Text) # New: Added to persist this info
+    customer_village = db.Column(db.Text)
+    customer_mobile_num = db.Column(db.Text)
     bill_date = db.Column(db.Date, nullable=False)
     grand_total = db.Column(db.Float, nullable=False)
 
@@ -134,40 +135,6 @@ class Invoice(db.Model):
 
 # --- End SQLAlchemy Models ---
 
-# Function to initialize the database: create tables and seed initial data
-def init_db():
-    with app.app_context():
-        # Create all tables defined by the models
-        db.create_all()
-        logging.info("SQLAlchemy models converted to database tables.")
-
-        # Seed initial users if they don't exist
-        if not User.query.filter_by(username='admin').first():
-            admin_user = User(username='admin', role='admin')
-            admin_user.password = 'admin123' # This will hash the password via the setter
-            db.session.add(admin_user)
-            logging.info("Default admin user added.")
-        
-        if not User.query.filter_by(username='user').first():
-            regular_user = User(username='user', role='user')
-            regular_user.password = 'user123' # This will hash the password via the setter
-            db.session.add(regular_user)
-            logging.info("Default regular user added.")
-
-        # Initialize last_bill_number if it doesn't exist
-        if not Setting.query.filter_by(key='last_bill_number').first():
-            db.session.add(Setting(key='last_bill_number', value=0))
-            logging.info("Last bill number setting initialized to 0.")
-
-        db.session.commit()
-        logging.info("Database initialization complete (models created and data seeded).")
-
-        # Create temp directory for PDFs if it doesn't exist
-        if not os.path.exists('temp'):
-            os.makedirs('temp')
-            logging.info("Temporary PDF directory 'temp' created.")
-
-
 # Login required decorator to protect routes
 def login_required(f):
     @wraps(f)
@@ -201,10 +168,8 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        # New: Use SQLAlchemy to query user
         user = User.query.filter_by(username=username).first()
 
-        # New: Verify password using the model's method
         if user and user.verify_password(password):
             session['username'] = username
             session['role'] = user.role
@@ -244,29 +209,29 @@ def bills():
 @app.route('/get_bills')
 @login_required
 def get_bills():
-    # New: Use SQLAlchemy to fetch all bills
-    bills_data = Bill.query.order_by(Bill.bill_number.desc()).all()
+    # MODIFIED: Order by id descending to get the latest bills first, as bill_number is now a string.
+    bills_data = Bill.query.order_by(Bill.id.desc()).all()
 
     bills_list = []
     for bill in bills_data:
         bills_list.append({
             'bill_number': bill.bill_number,
             'customer_name': bill.customer_name,
-            'bill_date': bill.bill_date.strftime('%Y-%m-%d'), # Format date for JSON
+            'bill_date': bill.bill_date.strftime('%Y-%m-%d'),
             'grand_total': bill.grand_total
         })
     logging.info(f"Fetched {len(bills_list)} bills for display.")
     return jsonify(bills_list)
 
 
-# New route to handle bill cancellation
-@app.route('/cancel_bill/<int:bill_number>', methods=['POST'])
+# MODIFIED: Route now takes a string bill_number
+@app.route('/cancel_bill/<bill_number>', methods=['POST'])
 @login_required
 @admin_only
 def cancel_bill(bill_number):
     """
-    Cancels a bill, reverts stock quantities, and, if it was the last bill created,
-    reverts the last_bill_number to reclaim the bill number.
+    Cancels a bill and reverts stock quantities.
+    NOTE: This version does NOT revert the bill number to avoid sequence gaps.
     """
     try:
         bill = Bill.query.filter_by(bill_number=bill_number).first()
@@ -274,21 +239,8 @@ def cancel_bill(bill_number):
             logging.warning(f"Attempted to cancel non-existent bill number: {bill_number}")
             return jsonify({'error': 'Bill not found.'}), 404
         
-        # New logic to handle bill number reversion
-        # Check if the cancelled bill is the last one in the sequence
-        last_bill_number_setting = Setting.query.filter_by(key='last_bill_number').first()
-        if last_bill_number_setting and bill.bill_number == last_bill_number_setting.value:
-            logging.info(f"Reverting last bill number from {last_bill_number_setting.value} to {last_bill_number_setting.value - 1} due to cancellation of bill {bill_number}.")
-            last_bill_number_setting.value -= 1
-            db.session.add(last_bill_number_setting)
-        
-        # Revert stock quantities for each item in the cancelled bill
+        # Revert stock quantities
         bill_items = BillItem.query.filter_by(bill_id=bill.id).all()
-        if not bill_items:
-            logging.warning(f"Bill {bill_number} found but has no items to revert.")
-            db.session.delete(bill)
-            db.session.commit()
-            return jsonify({'success': f'Bill {bill_number} cancelled (no items to revert).'}), 200
         for item in bill_items:
             product = Product.query.filter_by(name=item.product_name).first()
             if product:
@@ -296,13 +248,15 @@ def cancel_bill(bill_number):
                 db.session.add(product)
                 logging.info(f"Reverted stock for product '{product.name}': +{item.qty}")
             else:
+                # This case is unlikely but handled for safety
                 logging.error(f"Product '{item.product_name}' not found during cancellation of bill {bill_number}.")
                 raise ValueError(f"Product '{item.product_name}' not found in inventory.")
         
-        # Delete the bill items and the bill itself
+        # Delete bill items and the bill itself
         for item in bill_items:
             db.session.delete(item)
         db.session.delete(bill)
+        
         db.session.commit()
         
         logging.info(f"Bill {bill_number} and associated items successfully cancelled. Stock quantities reverted.")
@@ -315,6 +269,7 @@ def cancel_bill(bill_number):
         db.session.rollback()
         logging.error(f"Unexpected error cancelling bill {bill_number}: {e}", exc_info=True)
         return jsonify({'error': 'An unexpected error occurred.'}), 500
+
 # Route for inventory selection page
 @app.route('/inventory')
 @login_required
@@ -329,9 +284,7 @@ def inventory_selection():
 def inventory(product_type):
     products = []
     try:
-        # New: Use SQLAlchemy to query products
         products_data = Product.query.filter_by(product_type=product_type).order_by(Product.name.asc()).all()
-
         for product in products_data:
             products.append({
                 'id': product.id,
@@ -350,7 +303,6 @@ def inventory(product_type):
         logging.info(f"Fetched {len(products)} products for product type '{product_type}'.")
     except Exception as e:
         logging.error(f"Error fetching inventory for '{product_type}': {e}")
-
     return render_template('inventory.html', products=products, product_type=product_type)
 
 # API endpoint to add a new product
@@ -359,24 +311,18 @@ def inventory(product_type):
 @admin_only
 def add_product_web():
     data = request.form
-    # Input validation for numeric fields
     try:
         rate = float(data['rate'])
         stock_qty = int(data['stock_qty'])
         gst_percentage = float(data['gst_percentage'])
     except ValueError:
-        logging.warning("Invalid numeric input for product addition.")
-        return jsonify({'error': 'Rate, Stock Quantity, and GST Percentage must be valid numbers.'}), 400
-
+        return jsonify({'error': 'Rate, Stock Quantity, and GST must be valid numbers.'}), 400
     if rate < 0 or stock_qty < 0 or gst_percentage < 0:
-        logging.warning("Negative numeric input detected for product addition.")
-        return jsonify({'error': 'Rate, Stock Quantity, and GST Percentage cannot be negative.'}), 400
-
+        return jsonify({'error': 'Rate, Stock Quantity, and GST cannot be negative.'}), 400
     try:
-        # New: Create a new Product instance and add to session
         new_product = Product(
             name=data['name'],
-            company_name=data.get('company_name'), # Use .get() for optional fields
+            company_name=data.get('company_name'),
             product_type=data['product_type'],
             mfg_date=data.get('mfg_date'),
             exp_date=data.get('exp_date'),
@@ -388,31 +334,25 @@ def add_product_web():
             gst_percentage=gst_percentage
         )
         db.session.add(new_product)
-        db.session.commit() # Commit changes to the database
+        db.session.commit()
         logging.info(f"Product '{data['name']}' added successfully.")
         return redirect(url_for('inventory', product_type=data['product_type']))
     except Exception as e:
-        db.session.rollback() # Rollback on error
+        db.session.rollback()
         logging.error(f"Error adding product: {e}")
-        # Check for unique constraint violation (product name)
         if "UNIQUE constraint failed: products.name" in str(e):
              return jsonify({'error': 'Product name already exists.'}), 400
         return jsonify({'error': str(e)}), 400
-
 
 # Route to render the edit product form
 @app.route('/edit_product_form/<int:product_id>')
 @login_required
 @admin_only
 def edit_product_form(product_id):
-    # New: Query product by ID
     product = Product.query.get(product_id)
-
     if product:
-        logging.info(f"Fetched product for editing: ID {product_id}")
         return render_template('edit_product_form.html', product=product)
     else:
-        logging.warning(f"Product with ID {product_id} not found for editing.")
         return "Product not found.", 404
 
 # Route to handle the product update
@@ -421,31 +361,20 @@ def edit_product_form(product_id):
 @admin_only
 def update_product():
     data = request.form
-    # Input validation for numeric fields
     try:
         rate = float(data['rate'])
         stock_qty = int(data['stock_qty'])
         gst_percentage = float(data['gst_percentage'])
     except ValueError:
-        logging.warning("Invalid numeric input for product update.")
-        return jsonify({'error': 'Rate, Stock Quantity, and GST Percentage must be valid numbers.'}), 400
-
+        return jsonify({'error': 'Rate, Stock Quantity, and GST must be valid numbers.'}), 400
     if rate < 0 or stock_qty < 0 or gst_percentage < 0:
-        logging.warning("Negative numeric input detected for product update.")
-        return jsonify({'error': 'Rate, Stock Quantity, and GST Percentage cannot be negative.'}), 400
-
+        return jsonify({'error': 'Rate, Stock Quantity, and GST cannot be negative.'}), 400
     try:
         product_id = data['product_id']
         product_type = data['product_type']
-
-        # New: Fetch the product to update
         product = Product.query.get(product_id)
-
         if not product:
-            logging.warning(f"Product ID {product_id} not found for update.")
             return jsonify({'error': 'Product not found.'}), 404
-
-        # Update product attributes
         product.name = data['name']
         product.company_name = data.get('company_name')
         product.product_type = data['product_type']
@@ -457,14 +386,12 @@ def update_product():
         product.rate = rate
         product.stock_qty = stock_qty
         product.gst_percentage = gst_percentage
-
-        db.session.commit() # Commit changes to the database
+        db.session.commit()
         logging.info(f"Product ID {product_id} updated successfully.")
         return redirect(url_for('inventory', product_type=product_type))
     except Exception as e:
-        db.session.rollback() # Rollback on error
+        db.session.rollback()
         logging.error(f"Error updating product ID {product_id}: {e}")
-        # Check for unique constraint violation (product name)
         if "UNIQUE constraint failed: products.name" in str(e):
              return jsonify({'error': 'Product name already exists.'}), 400
         return jsonify({'error': str(e)}), 400
@@ -486,181 +413,142 @@ def billing_selection():
 @app.route('/billing/<product_type>')
 @login_required
 def billing(product_type):
-    products = []
-    try:
-        # New: Fetch products using SQLAlchemy
-        products_data = Product.query.filter_by(product_type=product_type).order_by(Product.name.asc()).all()
-        
-        products_list = []
-        for product in products_data:
-            products_list.append({
-                'id': product.id,
-                'name': product.name,
-                'company_name': product.company_name
-            })
-        logging.info(f"Fetched {len(products_list)} products for billing of type '{product_type}'.")
-    except Exception as e:
-        logging.error(f"Error fetching products for billing '{product_type}': {e}")
-    
+    products_data = Product.query.filter_by(product_type=product_type).order_by(Product.name.asc()).all()
+    products_list = [{'id': p.id, 'name': p.name, 'company_name': p.company_name} for p in products_data]
     return render_template('billing.html', products=products_list, today_date=datetime.date.today(), product_type=product_type)
 
 # New API endpoint to get a single product's details by ID
 @app.route('/product/<int:product_id>')
 @login_required
 def get_product_details(product_id):
-    try:
-        # New: Query product by ID
-        product = Product.query.get(product_id)
-        if product:
-            product_dict = {
-                'id': product.id,
-                'name': product.name,
-                'company_name': product.company_name,
-                'product_type': product.product_type,
-                'mfg_date': product.mfg_date,
-                'exp_date': product.exp_date,
-                'batch_num': product.batch_num,
-                'hsn_code': product.hsn_code,
-                'pack_size': product.pack_size,
-                'rate': product.rate,
-                'stock_qty': product.stock_qty,
-                'gst_percentage': product.gst_percentage
-            }
-            logging.info(f"Fetched details for product ID {product_id}.")
-            return jsonify(product_dict), 200
-        else:
-            logging.warning(f"Product ID {product_id} not found.")
-            return jsonify({'error': 'Product not found'}), 404
-    except Exception as e:
-        logging.error(f"Error fetching product details for ID {product_id}: {e}")
-        return jsonify({'error': str(e)}), 500
+    product = Product.query.get(product_id)
+    if product:
+        product_dict = {
+            'id': product.id,
+            'name': product.name,
+            'company_name': product.company_name,
+            'product_type': product.product_type,
+            'mfg_date': product.mfg_date,
+            'exp_date': product.exp_date,
+            'batch_num': product.batch_num,
+            'hsn_code': product.hsn_code,
+            'pack_size': product.pack_size,
+            'rate': product.rate,
+            'stock_qty': product.stock_qty,
+            'gst_percentage': product.gst_percentage
+        }
+        return jsonify(product_dict), 200
+    else:
+        return jsonify({'error': 'Product not found'}), 404
 
-# New API endpoint to generate the PDF bill with a simple, sequential number
+# MODIFIED: Major overhaul of this route for new bill number generation
 @app.route('/generate_pdf', methods=['POST'])
 @login_required
 def generate_pdf():
     data = request.json
-    
     try:
-        # Start a transaction (implicit with SQLAlchemy session)
-        
-        # Get and increment the last bill number
-        last_bill_number_setting = Setting.query.filter_by(key='last_bill_number').first()
-        if not last_bill_number_setting:
-            # This should ideally not happen if init_db runs correctly
-            last_bill_number_setting = Setting(key='last_bill_number', value=0)
-            db.session.add(last_bill_number_setting)
-            db.session.commit() # Commit the creation of setting first
-            
-        new_bill_number = last_bill_number_setting.value + 1
-        last_bill_number_setting.value = new_bill_number
-        db.session.add(last_bill_number_setting) # Mark as modified
-        logging.info(f"Generated new bill number: {new_bill_number}")
+        # --- Step 1: Determine Bill Type and Prefix ---
+        product_names = [item['name'] for item in data['products']]
+        if not product_names:
+            return jsonify({'error': 'Cannot generate a bill with no products.'}), 400
 
-        # Save the bill to the database using the Bill model
-        # New: Capturing village and mobileNum from frontend
+        product_types_in_bill = db.session.query(Product.product_type).filter(Product.name.in_(product_names)).distinct().all()
+        product_types_list = [pt[0] for pt in product_types_in_bill]
+
+        # Determine the primary type for this bill to select the correct counter
+        if 'pesticide' in product_types_list:
+            bill_type_key = 'pesticide'
+            prefix = 'BT/P/'
+        elif 'fertilizer' in product_types_list:
+            bill_type_key = 'fertilizer'
+            prefix = 'BT/F/'
+        else:
+            bill_type_key = 'general' # Fallback for other product types
+            prefix = 'BT/G/'
+            
+        setting_key = f"last_bill_number_{bill_type_key}"
+        logging.info(f"Determined bill type key: {bill_type_key}")
+
+        # --- Step 2: Get and Increment the Correct Bill Counter ---
+        last_bill_setting = Setting.query.filter_by(key=setting_key).first()
+        if not last_bill_setting:
+            # This is a fallback, should be created by db_init.py
+            last_bill_setting = Setting(key=setting_key, value=0)
+            db.session.add(last_bill_setting)
+            db.session.commit()
+
+        new_number = last_bill_setting.value + 1
+        last_bill_setting.value = new_number
+        db.session.add(last_bill_setting)
+        
+        # Format the new bill number string (e.g., 'BT/F/001')
+        formatted_bill_number = f"{prefix}{str(new_number).zfill(3)}"
+        logging.info(f"Generated new formatted bill number: {formatted_bill_number}")
+
+        # --- Step 3: Save Bill and Items (as before) ---
         new_bill = Bill(
-            bill_number=new_bill_number,
+            bill_number=formatted_bill_number,
             customer_name=data['customerName'],
-            customer_village=data.get('village', 'N/A'), # Get from data, default to N/A
-            customer_mobile_num=data.get('mobileNum', 'N/A'), # Get from data, default to N/A
-            bill_date=datetime.datetime.strptime(data['billDate'], '%Y-%m-%d').date(), # Convert to date object
+            customer_village=data.get('village', 'N/A'),
+            customer_mobile_num=data.get('mobileNum', 'N/A'),
+            bill_date=datetime.datetime.strptime(data['billDate'], '%Y-%m-%d').date(),
             grand_total=data['grandTotal']
         )
         db.session.add(new_bill)
-        db.session.flush() # Flush to get bill_id before committing (needed for bill_items)
-        logging.info(f"Bill header saved with ID {new_bill.id}.")
+        db.session.flush()
 
-        # Save bill items and update stock
         for item_data in data['products']:
-            # Basic validation for quantities and rates during billing
-            try:
-                qty = int(item_data['qty'])
-                rate = float(item_data['rate'])
-                amount = float(item_data['amount'])
-                gst = float(item_data['gst'])
-                if qty <= 0 or rate < 0 or amount < 0 or gst < 0:
-                    raise ValueError("Quantity must be positive. Rate, Amount, and GST must be non-negative.")
-            except ValueError as ve:
-                db.session.rollback() # Rollback transaction if any item data is invalid
-                logging.error(f"Invalid product data during bill generation: {ve}")
-                return jsonify({'error': f"Invalid product data: {ve}"}), 400
-
-            # Update product stock
+            qty = int(item_data['qty'])
             product_to_update = Product.query.filter_by(name=item_data['name']).first()
-            if product_to_update:
-                if product_to_update.stock_qty < qty:
-                    db.session.rollback()
-                    logging.warning(f"Insufficient stock for {item_data['name']}. Available: {product_to_update.stock_qty}, Requested: {qty}")
-                    return jsonify({'error': f"Insufficient stock for {item_data['name']}. Available: {product_to_update.stock_qty}, Requested: {qty}"}), 400
-                product_to_update.stock_qty -= qty
-                db.session.add(product_to_update) # Mark as modified
-            else:
+            if not product_to_update or product_to_update.stock_qty < qty:
                 db.session.rollback()
-                logging.error(f"Product '{item_data['name']}' not found when updating stock.")
-                return jsonify({'error': f"Product '{item_data['name']}' not found."}), 404
+                error_msg = f"Insufficient stock for {item_data['name']}" if product_to_update else f"Product '{item_data['name']}' not found."
+                return jsonify({'error': error_msg}), 400
+            
+            product_to_update.stock_qty -= qty
+            db.session.add(product_to_update)
 
-            # Create new BillItem instance
             new_bill_item = BillItem(
                 bill_id=new_bill.id,
                 product_name=item_data['name'],
                 qty=qty,
-                rate=rate,
-                amount=amount,
-                gst_percentage=gst
+                rate=float(item_data['rate']),
+                amount=float(item_data['amount']),
+                gst_percentage=float(item_data['gst'])
             )
             db.session.add(new_bill_item)
         
-        db.session.commit() # Commit the entire transaction
+        db.session.commit()
 
-        # --- LOGIC TO DETERMINE BILL TYPE ---
-        product_names = [item_data['name'] for item_data in data['products']]
-        bill_type = 'general' # Default to general bill
-        if product_names:
-            # Query for product types of items in the current bill
-            product_types_in_bill = db.session.query(Product.product_type).filter(Product.name.in_(product_names)).distinct().all()
-            product_types_in_bill_list = [pt[0] for pt in product_types_in_bill]
-
-            if 'pesticide' in product_types_in_bill_list:
-                bill_type = 'pesticide'
-            elif 'fertilizer' in product_types_in_bill_list:
-                bill_type = 'fertilizer'
-        logging.info(f"Determined bill type for Bill {new_bill_number}: {bill_type}")
-        # --- END BILL TYPE LOGIC ---
-
-        # Prepare data for the PDF template
+        # --- Step 4: Generate and Serve PDF ---
         pdf_template_data = {
-            'billNumber': new_bill_number,
+            'billNumber': formatted_bill_number,
             'customerName': data['customerName'],
-            'billDate': data['billDate'], # Keep as string for template
+            'billDate': data['billDate'],
             'grandTotal': data['grandTotal'],
             'village': data.get('village', 'N/A'),
             'mobileNum': data.get('mobileNum', 'N/A'),
-            'products': data['products'], # The original product data from JS
-            'totalBeforeTax': data['totalBeforeTax'], # Pass calculated values from JS
-            'totalGst': data['totalGst'], # Pass calculated values from JS
-            'bill_type': bill_type
+            'products': data['products'],
+            'totalBeforeTax': data['totalBeforeTax'],
+            'totalGst': data['totalGst'],
+            'bill_type': bill_type_key 
         }
         
-        # Render the HTML template with the bill data
         html_string = render_template('bill_template.html', bill_data=pdf_template_data)
-        
-        # Convert the HTML string to a PDF
         pdf_bytes = HTML(string=html_string).write_pdf()
         
-        # Create a unique filename and save the PDF temporarily
         filename = f"bill_{uuid.uuid4().hex}.pdf"
         filepath = os.path.join('temp', filename)
         with open(filepath, 'wb') as f:
             f.write(pdf_bytes)
-        logging.info(f"Generated PDF saved temporarily as '{filename}'.")
 
         return jsonify({'filename': filename}), 200
 
     except Exception as e:
-        db.session.rollback() # Rollback transaction on any error
-        logging.error(f"Error generating PDF for bill: {e}", exc_info=True) # exc_info for full traceback
+        db.session.rollback()
+        logging.error(f"Error generating PDF for bill: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
 
 # New route to serve the temporary PDF file
 @app.route('/serve_pdf/<filename>')
@@ -668,32 +556,19 @@ def generate_pdf():
 def serve_pdf(filename):
     filepath = os.path.join('temp', filename)
     if os.path.exists(filepath):
-        logging.info(f"Serving temporary PDF file: '{filename}'.")
         return send_from_directory('temp', filename, as_attachment=False)
     else:
-        logging.warning(f"Attempted to serve non-existent PDF file: '{filename}'.")
         return jsonify({'error': 'File not found'}), 404
 
-# New route to view a historical bill
-@app.route('/view_bill/<int:bill_number>')
+# MODIFIED: Route now takes a string bill_number
+@app.route('/view_bill/<bill_number>')
 @login_required
 def view_bill(bill_number):
     try:
-        # Fetch bill header details using SQLAlchemy
         bill_header = Bill.query.filter_by(bill_number=bill_number).first()
-        
         if not bill_header:
-            logging.warning(f"Bill number {bill_number} not found for viewing.")
             return "Bill not found.", 404
             
-        # Access attributes directly from the model instance
-        customer_name = bill_header.customer_name
-        bill_date = bill_header.bill_date.strftime('%Y-%m-%d') # Format for template
-        grand_total = bill_header.grand_total
-        village = bill_header.customer_village
-        mobileNum = bill_header.customer_mobile_num
-
-        # Fetch all bill items associated with this bill, and join with product details
         bill_items_data = db.session.query(
             BillItem, Product.company_name, Product.mfg_date, Product.exp_date,
             Product.batch_num, Product.pack_size, Product.product_type
@@ -701,76 +576,54 @@ def view_bill(bill_number):
             BillItem.bill_id == bill_header.id
         ).all()
         
-        bill_items = []
-        product_types_for_bill_type_determination = []
-        for item_obj, company_name, mfg_date, exp_date, batch_num, pack_size, product_type in bill_items_data:
+        bill_items, product_types = [], []
+        for item_obj, company_name, mfg_date, exp_date, batch_num, pack_size, p_type in bill_items_data:
             bill_items.append({
-                'name': item_obj.product_name,
-                'qty': item_obj.qty,
-                'rate': item_obj.rate,
-                'amount': item_obj.amount,
-                'gst': item_obj.gst_percentage,
-                'company_name': company_name,
-                'mfg_date': mfg_date,
-                'exp_date': exp_date,
-                'batch_num': batch_num,
-                'pack_size': pack_size
+                'name': item_obj.product_name, 'qty': item_obj.qty, 'rate': item_obj.rate,
+                'amount': item_obj.amount, 'gst': item_obj.gst_percentage, 'company_name': company_name,
+                'mfg_date': mfg_date, 'exp_date': exp_date, 'batch_num': batch_num, 'pack_size': pack_size
             })
-            product_types_for_bill_type_determination.append(product_type) # Collect product types
+            product_types.append(p_type)
 
-        # --- LOGIC TO DETERMINE BILL TYPE FOR HISTORICAL VIEW ---
-        bill_type = 'general' # Default to general bill
-        if 'pesticide' in product_types_for_bill_type_determination:
-            bill_type = 'pesticide'
-        elif 'fertilizer' in product_types_for_bill_type_determination:
-            bill_type = 'fertilizer'
-        logging.info(f"Viewing historical bill {bill_number}, determined type: {bill_type}")
-        # --- END BILL TYPE LOGIC ---
+        bill_type = 'general'
+        if 'pesticide' in product_types: bill_type = 'pesticide'
+        elif 'fertilizer' in product_types: bill_type = 'fertilizer'
 
-        # Reconstruct the bill data dictionary for the template
         bill_data = {
-            'billNumber': bill_number,
-            'customerName': customer_name,
-            'billDate': bill_date,
-            'grandTotal': grand_total,
-            'village': village, # Now retrieved from DB
-            'mobileNum': mobileNum, # Now retrieved from DB
-            'products': bill_items, # Full list with product details
-            'totalBeforeTax': 0, # Will recalculate for consistency
-            'totalGst': 0,       # Will recalculate for consistency
-            'bill_type': bill_type
+            'billNumber': bill_header.bill_number,
+            'customerName': bill_header.customer_name,
+            'billDate': bill_header.bill_date.strftime('%Y-%m-%d'),
+            'grandTotal': bill_header.grand_total,
+            'village': bill_header.customer_village,
+            'mobileNum': bill_header.customer_mobile_num,
+            'products': bill_items,
+            'totalBeforeTax': 0, 'totalGst': 0, 'bill_type': bill_type
         }
         
         for item in bill_items:
-            # Recalculate totals for display
-            gst_percentage = item['gst']
-            if gst_percentage > 0:
-                base_price = item['rate'] / (1 + gst_percentage / 100)
-                gst_amount_per_item = item['rate'] - base_price
-            else:
-                base_price = item['rate']
-                gst_amount_per_item = 0
-            
+            base_price = item['rate'] / (1 + item['gst'] / 100) if item['gst'] > 0 else item['rate']
+            gst_amount_per_item = item['rate'] - base_price
             bill_data['totalBeforeTax'] += base_price * item['qty']
             bill_data['totalGst'] += gst_amount_per_item * item['qty']
             
-        # Render the HTML template with the reconstructed data
         html_string = render_template('bill_template.html', bill_data=bill_data)
-        
-        # Convert HTML to PDF
         pdf_bytes = HTML(string=html_string).write_pdf()
         
-        logging.info(f"Generated PDF for historical bill {bill_number} and serving.")
         return send_file(
             BytesIO(pdf_bytes),
             mimetype='application/pdf',
             as_attachment=False,
-            download_name=f'bill_{bill_number}.pdf'
+            download_name=f'bill_{bill_number.replace("/", "_")}.pdf'
         )
 
     except Exception as e:
         logging.error(f"Error viewing historical bill {bill_number}: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+
+# ... (The rest of the file from reports_selection onwards remains unchanged) ...
+# --- PASTE THE REST OF YOUR ORIGINAL app.py FILE HERE ---
+# (from @app.route('/reports') to the end)
 
 # Route for sales reports selection page
 @app.route('/reports')
