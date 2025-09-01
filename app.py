@@ -133,6 +133,16 @@ class Invoice(db.Model):
     def __repr__(self):
         return f"<Invoice {self.original_filename}>"
 
+# NEW MODEL: Tracks bill numbers available for reuse
+class AvailableBillNumber(db.Model):
+    __tablename__ = 'available_bill_numbers'
+    id = db.Column(db.Integer, primary_key=True)
+    product_type = db.Column(db.Text, nullable=False)
+    bill_number_int = db.Column(db.Integer, nullable=False)
+
+    def __repr__(self):
+        return f"<AvailableBillNumber {self.product_type} - {self.bill_number_int}>"
+
 # --- End SQLAlchemy Models ---
 
 # Login required decorator to protect routes
@@ -251,51 +261,52 @@ def get_bills():
     return jsonify(bills_list)
 
 
-# MODIFIED: Route now takes a string bill_number
+# UPDATED: cancel_bill function to add cancelled numbers to a reuse pool
 @app.route('/cancel_bill/<path:bill_number>', methods=['POST'])
 @login_required
 @admin_only
 def cancel_bill(bill_number):
-    """
-    Cancels a bill and reverts stock quantities.
-    NOTE: This version does NOT revert the bill number to avoid sequence gaps.
-    """
     try:
         bill = Bill.query.filter_by(bill_number=bill_number).first()
         if not bill:
-            logging.warning(f"Attempted to cancel non-existent bill number: {bill_number}")
             return jsonify({'error': 'Bill not found.'}), 404
-        
-        # Revert stock quantities
+
+        # --- NEW LOGIC: Save the cancelled bill number for reuse ---
+        try:
+            # Parse the number, e.g., 'BT/P/56' -> ('pesticide', 56)
+            parts = bill_number.split('/')
+            number_int = int(parts[2])
+            product_type_char = parts[1]
+            
+            if product_type_char == 'P': p_type = 'pesticide'
+            elif product_type_char == 'F': p_type = 'fertilizer'
+            else: p_type = 'general'
+            
+            # Add the number to the available pool for reuse
+            new_available_number = AvailableBillNumber(product_type=p_type, bill_number_int=number_int)
+            db.session.add(new_available_number)
+            logging.info(f"Added bill number {number_int} for type '{p_type}' to available pool.")
+        except (ValueError, IndexError) as e:
+            logging.error(f"Could not parse bill number '{bill_number}' to add to available pool: {e}")
+
+        # --- Old Logic: Revert stock and delete the bill ---
         bill_items = BillItem.query.filter_by(bill_id=bill.id).all()
         for item in bill_items:
             product = Product.query.filter_by(name=item.product_name).first()
             if product:
                 product.stock_qty += item.qty
                 db.session.add(product)
-                logging.info(f"Reverted stock for product '{product.name}': +{item.qty}")
-            else:
-                # This case is unlikely but handled for safety
-                logging.error(f"Product '{item.product_name}' not found during cancellation of bill {bill_number}.")
-                raise ValueError(f"Product '{item.product_name}' not found in inventory.")
         
-        # Delete bill items and the bill itself
         for item in bill_items:
             db.session.delete(item)
         db.session.delete(bill)
         
         db.session.commit()
         
-        logging.info(f"Bill {bill_number} and associated items successfully cancelled. Stock quantities reverted.")
-        return jsonify({'success': 'Bill cancelled successfully. Stock has been reverted.'}), 200
-    except ValueError as ve:
-        db.session.rollback()
-        logging.error(f"Error during bill cancellation for {bill_number}: {ve}")
-        return jsonify({'error': str(ve)}), 500
+        return jsonify({'success': 'Bill cancelled successfully. The bill number is now available for the next bill.'}), 200
     except Exception as e:
         db.session.rollback()
-        logging.error(f"Unexpected error cancelling bill {bill_number}: {e}", exc_info=True)
-        return jsonify({'error': 'An unexpected error occurred.'}), 500
+        return jsonify({'error': 'An unexpected error occurred during cancellation.'}), 500
 
 # Route for inventory selection page
 @app.route('/inventory')
@@ -469,12 +480,12 @@ def get_product_details(product_id):
         return jsonify({'error': 'Product not found'}), 404
 
 # MODIFIED: Major overhaul of this route for new bill number generation
+# UPDATED: generate_pdf function to reuse cancelled numbers first
 @app.route('/generate_pdf', methods=['POST'])
 @login_required
 def generate_pdf():
     data = request.json
     try:
-        # --- Step 1: Determine Bill Type and Prefix ---
         product_names = [item['name'] for item in data['products']]
         if not product_names:
             return jsonify({'error': 'Cannot generate a bill with no products.'}), 400
@@ -482,42 +493,37 @@ def generate_pdf():
         product_types_in_bill = db.session.query(Product.product_type).filter(Product.name.in_(product_names)).distinct().all()
         product_types_list = [pt[0] for pt in product_types_in_bill]
 
-        # Determine the primary type for this bill to select the correct counter
-        if 'pesticide' in product_types_list:
-            bill_type_key = 'pesticide'
-            prefix = 'BT/P/'
-        elif 'fertilizer' in product_types_list:
-            bill_type_key = 'fertilizer'
-            prefix = 'BT/F/'
-        else:
-            bill_type_key = 'general' # Fallback for other product types
-            prefix = 'BT/G/'
-            
-        setting_key = f"last_bill_number_{bill_type_key}"
-        logging.info(f"Determined bill type key: {bill_type_key}")
+        if 'pesticide' in product_types_list: bill_type_key, prefix = 'pesticide', 'BT/P/'
+        elif 'fertilizer' in product_types_list: bill_type_key, prefix = 'fertilizer', 'BT/F/'
+        else: bill_type_key, prefix = 'general', 'BT/G/'
 
-        # --- Step 2: Get and Increment the Correct Bill Counter ---
-        last_bill_setting = Setting.query.filter_by(key=setting_key).first()
-        if not last_bill_setting:
-            # This is a fallback, should be created by db_init.py
-            last_bill_setting = Setting(key=setting_key, value=0)
-            db.session.add(last_bill_setting)
-            db.session.commit()
-
-        new_number = last_bill_setting.value + 1
-        last_bill_setting.value = new_number
-        db.session.add(last_bill_setting)
+        # --- NEW LOGIC: Check for an available reused number first ---
+        available_number_obj = AvailableBillNumber.query.filter_by(product_type=bill_type_key).order_by(AvailableBillNumber.bill_number_int.asc()).first()
         
-        # Format the new bill number string (e.g., 'BT/F/001')
-        formatted_bill_number = f"{prefix}{str(new_number).zfill(3)}"
-        logging.info(f"Generated new formatted bill number: {formatted_bill_number}")
+        if available_number_obj:
+            # If a number is found, use it and remove it from the pool
+            new_number = available_number_obj.bill_number_int
+            db.session.delete(available_number_obj)
+            logging.info(f"Reusing available bill number {new_number} for type '{bill_type_key}'.")
+        else:
+            # If no number is found, generate a new one
+            setting_key = f"last_bill_number_{bill_type_key}"
+            last_bill_setting = Setting.query.filter_by(key=setting_key).first()
+            if not last_bill_setting:
+                last_bill_setting = Setting(key=setting_key, value=0)
+                db.session.add(last_bill_setting)
+            
+            new_number = last_bill_setting.value + 1
+            last_bill_setting.value = new_number
+            db.session.add(last_bill_setting)
+            logging.info(f"Generated new sequential bill number: {new_number} for type '{bill_type_key}'.")
 
-        # --- Step 3: Save Bill and Items (as before) ---
+        formatted_bill_number = f"{prefix}{str(new_number).zfill(3)}"
+
+        # --- Logic to save bill and generate PDF remains the same ---
         new_bill = Bill(
-            bill_number=formatted_bill_number,
-            customer_name=data['customerName'],
-            customer_village=data.get('village', 'N/A'),
-            customer_mobile_num=data.get('mobileNum', 'N/A'),
+            bill_number=formatted_bill_number, customer_name=data['customerName'],
+            customer_village=data.get('village', 'N/A'), customer_mobile_num=data.get('mobileNum', 'N/A'),
             bill_date=datetime.datetime.strptime(data['billDate'], '%Y-%m-%d').date(),
             grand_total=data['grandTotal']
         )
@@ -529,46 +535,24 @@ def generate_pdf():
             product_to_update = Product.query.filter_by(name=item_data['name']).first()
             if not product_to_update or product_to_update.stock_qty < qty:
                 db.session.rollback()
-                error_msg = f"Insufficient stock for {item_data['name']}" if product_to_update else f"Product '{item_data['name']}' not found."
-                return jsonify({'error': error_msg}), 400
-            
+                return jsonify({'error': f"Insufficient stock for {item_data['name']}"}), 400
             product_to_update.stock_qty -= qty
             db.session.add(product_to_update)
-
             new_bill_item = BillItem(
-                bill_id=new_bill.id,
-                product_name=item_data['name'],
-                qty=qty,
-                rate=float(item_data['rate']),
-                amount=float(item_data['amount']),
+                bill_id=new_bill.id, product_name=item_data['name'], qty=qty,
+                rate=float(item_data['rate']), amount=float(item_data['amount']),
                 gst_percentage=float(item_data['gst'])
             )
             db.session.add(new_bill_item)
         
         db.session.commit()
-
-        # --- Step 4: Generate and Serve PDF ---
-        pdf_template_data = {
-            'billNumber': formatted_bill_number,
-            'customerName': data['customerName'],
-            'billDate': data['billDate'],
-            'grandTotal': data['grandTotal'],
-            'village': data.get('village', 'N/A'),
-            'mobileNum': data.get('mobileNum', 'N/A'),
-            'products': data['products'],
-            'totalBeforeTax': data['totalBeforeTax'],
-            'totalGst': data['totalGst'],
-            'bill_type': bill_type_key 
-        }
         
+        pdf_template_data = { 'billNumber': formatted_bill_number, **data, 'bill_type': bill_type_key }
         html_string = render_template('bill_template.html', bill_data=pdf_template_data)
         pdf_bytes = HTML(string=html_string).write_pdf()
-        
         filename = f"bill_{uuid.uuid4().hex}.pdf"
         filepath = os.path.join('temp', filename)
-        with open(filepath, 'wb') as f:
-            f.write(pdf_bytes)
-
+        with open(filepath, 'wb') as f: f.write(pdf_bytes)
         return jsonify({'filename': filename}), 200
 
     except Exception as e:
