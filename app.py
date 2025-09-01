@@ -312,10 +312,7 @@ def view_bill(bill_number):
                 'batch_num': batch_num,
                 'pack_size': pack_size
             })
-            product_types_for_bill_type_determination.append(product_type) # Collect product types
-
-
-
+            
 # Route for inventory selection page
 @app.route('/inventory')
 @login_required
