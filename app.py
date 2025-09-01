@@ -202,15 +202,42 @@ def dashboard():
 # Route for bills selection page
 @app.route('/bills')
 @login_required
-def bills():
-    return render_template('bills.html')
+def bills_selection():
+    return render_template('bills_selection.html')
+
+# NEW: Route to display a filtered list of bills
+@app.route('/bills/<bill_type>')
+@login_required
+def bills_list(bill_type):
+    # This dictionary helps create a nice title for the page
+    titles = {
+        'pesticide': 'Pesticide Bills',
+        'fertilizer': 'Fertilizer Bills',
+        'old': 'Old / Migrated Bills'
+    }
+    # Get the title, with a default fallback
+    bill_type_title = titles.get(bill_type, 'All Bills')
+    return render_template('bills.html', bill_type=bill_type, bill_type_title=bill_type_title)
 
 # API endpoint to get all bills for searching
+# MODIFIED: API endpoint now filters bills based on the 'type' query parameter
 @app.route('/get_bills')
 @login_required
 def get_bills():
-    # MODIFIED: Order by id descending to get the latest bills first, as bill_number is now a string.
-    bills_data = Bill.query.order_by(Bill.id.desc()).all()
+    bill_type = request.args.get('type', 'all') # Get 'type' from URL, e.g., /get_bills?type=pesticide
+
+    query = Bill.query
+
+    # Apply filter based on the bill number prefix
+    if bill_type == 'pesticide':
+        query = query.filter(Bill.bill_number.startswith('BT/P/'))
+    elif bill_type == 'fertilizer':
+        query = query.filter(Bill.bill_number.startswith('BT/F/'))
+    elif bill_type == 'old':
+        query = query.filter(Bill.bill_number.startswith('BT/OLD/'))
+    
+    # Order by ID descending to get the newest bills first
+    bills_data = query.order_by(Bill.id.desc()).all()
 
     bills_list = []
     for bill in bills_data:
@@ -220,7 +247,7 @@ def get_bills():
             'bill_date': bill.bill_date.strftime('%Y-%m-%d'),
             'grand_total': bill.grand_total
         })
-    logging.info(f"Fetched {len(bills_list)} bills for display.")
+    logging.info(f"Fetched {len(bills_list)} bills for type '{bill_type}'.")
     return jsonify(bills_list)
 
 
