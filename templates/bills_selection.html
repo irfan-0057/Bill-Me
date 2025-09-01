@@ -26,15 +26,15 @@
 
         <main class="dashboard-main">
             <div class="dashboard-grid">
-                <a href="{{ url_for('bills', bill_type='pesticide') }}" class="dashboard-card">
+                <a href="{{ url_for('bills_list', bill_type='pesticide') }}" class="dashboard-card">
                     <div class="card-icon">🕷️</div>
                     <div class="card-text">Pesticide Bills</div>
                 </a>
-                <a href="{{ url_for('bills', bill_type='fertilizer') }}" class="dashboard-card">
+                <a href="{{ url_for('bills_list', bill_type='fertilizer') }}" class="dashboard-card">
                     <div class="card-icon">🌱</div>
                     <div class="card-text">Fertilizer Bills</div>
                 </a>
-                <a href="{{ url_for('bills', bill_type='old') }}" class="dashboard-card">
+                <a href="{{ url_for('bills_list', bill_type='old') }}" class="dashboard-card">
                     <div class="card-icon">📜</div>
                     <div class="card-text">Old / Migrated Bills</div>
                 </a>
